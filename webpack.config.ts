@@ -187,6 +187,8 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
     .readFileSync(path.join(import.meta.dirname, entry.script), 'utf-8')
     .includes('@obfuscate');
   const script_filepath = path.parse(entry.script);
+  // 输出文件名：入口为 index 时使用父目录名（与项目同名），否则使用文件名
+  const output_name = script_filepath.name === 'index' ? path.basename(script_filepath.dir) : script_filepath.name;
 
   return (_env, argv) => ({
     experiments: {
@@ -210,13 +212,13 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
 
         return `${is_direct === true ? 'src' : 'webpack'}://${info.namespace}/${resource_path}${is_direct || is_vue_script ? '' : '?' + info.hash}`;
       },
-      filename: `${script_filepath.name}.js`,
+      filename: `${output_name}.js`,
       path: path.join(
         import.meta.dirname,
         'dist',
         path.relative(import.meta.dirname, script_filepath.dir).replace(/^[^\\/]+[\\/]/, ''),
       ),
-      chunkFilename: `${script_filepath.name}.[contenthash].chunk.js`,
+      chunkFilename: `${output_name}.[contenthash].chunk.js`,
       asyncChunks: true,
       clean: true,
       publicPath: '',

@@ -19,26 +19,9 @@
       </div>
 
       <div class="lorevnter-body">
-        <!-- 世界书 -->
-        <div v-if="runtime.currentTab === 'worldbooks'" class="tab-content">
-          <p class="tab-placeholder">
-            📖 世界书浏览与管理 — 待开发
-          </p>
-        </div>
-
-        <!-- 预设 -->
-        <div v-else-if="runtime.currentTab === 'presets'" class="tab-content">
-          <p class="tab-placeholder">
-            📦 预设管理 — 待开发
-          </p>
-        </div>
-
-        <!-- 设置 -->
-        <div v-else-if="runtime.currentTab === 'settings'" class="tab-content">
-          <p class="tab-placeholder">
-            ⚙ 设置面板 — 待开发
-          </p>
-        </div>
+        <WorldbooksTab v-if="runtime.currentTab === 'worldbooks'" />
+        <PresetsTab v-else-if="runtime.currentTab === 'presets'" />
+        <SettingsTab v-else-if="runtime.currentTab === 'settings'" />
 
         <!-- 日志（仅 debugMode 下显示） -->
         <div v-else-if="runtime.currentTab === 'logs'" class="tab-content tab-logs">
@@ -71,6 +54,9 @@
 import { useSettingsStore } from '../settings';
 import { useRuntimeStore } from '../state';
 import { clearLogBuffer } from '../logger';
+import WorldbooksTab from './tabs/WorldbooksTab.vue';
+import PresetsTab from './tabs/PresetsTab.vue';
+import SettingsTab from './tabs/SettingsTab.vue';
 
 const { settings } = useSettingsStore();
 const runtime = useRuntimeStore();
