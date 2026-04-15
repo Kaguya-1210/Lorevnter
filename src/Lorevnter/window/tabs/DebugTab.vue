@@ -211,99 +211,101 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.debug-tab { display: flex; flex-direction: column; gap: 12px; }
+.debug-tab { display: flex; flex-direction: column; gap: 16px; padding: 4px; }
 
 .debug-section {
-  background: var(--lore-bg-secondary); border-radius: 12px;
-  border: 1px solid var(--lore-border); overflow: hidden;
+  background: var(--lore-bg-secondary); border-radius: var(--lore-radius-md);
+  border: 1px solid var(--lore-border-light); overflow: hidden;
 }
 .debug-section-header {
-  display: flex; align-items: center; gap: 6px;
-  padding: 10px 14px; cursor: pointer; transition: background 0.15s;
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px; cursor: pointer; transition: background 0.15s;
 }
 .debug-section-header:hover { background: var(--lore-bg-tertiary); }
-.debug-section-icon { font-size: 10px; color: var(--lore-text-secondary); width: 14px; }
+.debug-section-icon { font-size: 11px; color: var(--lore-text-secondary); width: 14px; display: inline-block; text-align: center; }
 .debug-section-title {
-  font-size: 12px; font-weight: 600; color: var(--lore-text-primary); flex: 1;
+  font-size: 14px; font-weight: 500; color: var(--lore-text-primary); flex: 1; letter-spacing: -0.2px;
 }
 .debug-section-body {
-  padding: 0 14px 12px; border-top: 1px solid var(--lore-border);
-  padding-top: 10px;
+  padding: 0 14px 12px; border-top: 1px solid var(--lore-border-light);
+  padding-top: 12px;
 }
 
 /* KV 表 */
-.debug-kv { display: flex; flex-direction: column; gap: 4px; }
+.debug-kv { display: flex; flex-direction: column; }
 .debug-kv-item {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
+  padding: 8px 0; border-bottom: 1px solid var(--lore-border-light);
 }
-.debug-key { font-size: 11px; color: var(--lore-text-secondary); }
-.debug-value { font-size: 11px; color: var(--lore-text-primary); text-align: right; max-width: 60%; word-break: break-all; }
-.debug-mono { font-family: 'Consolas', monospace; font-size: 10px; }
+.debug-kv-item:last-child { border-bottom: none; }
+.debug-key { font-size: 13px; color: var(--lore-text-secondary); }
+.debug-value { font-size: 13px; color: var(--lore-text-primary); text-align: right; max-width: 60%; word-break: break-word; overflow-wrap: break-word; font-weight: 500; }
+.debug-mono { font-family: -apple-system, monospace; font-size: 12px; }
 
 /* AI 调用 */
 .debug-ai-call {
-  padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
+  padding: 12px 0; border-bottom: 1px solid var(--lore-border-light); display: flex; flex-direction: column; gap: 6px;
 }
 .debug-ai-call:last-child { border-bottom: none; }
 .debug-ai-call-header {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
-.debug-ai-call-time { font-size: 10px; color: var(--lore-text-secondary); font-family: monospace; }
+.debug-ai-call-time { font-size: 12px; color: var(--lore-text-secondary); font-family: -apple-system, monospace; }
 .debug-ai-call-mode {
-  font-size: 10px; padding: 1px 6px; border-radius: 4px;
+  font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 500;
   background: var(--lore-accent-bg); color: var(--lore-accent);
 }
-.debug-ai-call-stat { font-size: 10px; color: var(--lore-text-secondary); }
+.debug-ai-call-stat { font-size: 12px; color: var(--lore-text-secondary); }
 .debug-ai-call-result {
-  font-size: 10px; padding: 1px 6px; border-radius: 4px;
-  background: rgba(255,255,255,0.05); color: var(--lore-text-secondary);
+  font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 500;
+  background: var(--lore-bg-primary); color: var(--lore-text-secondary);
 }
-.debug-ai-call-result.has-updates { background: rgba(80, 200, 120, 0.1); color: #50c878; }
-.debug-ai-call-updates { margin-top: 6px; padding-left: 12px; }
+.debug-ai-call-result.has-updates { background: var(--lore-success-bg); color: var(--lore-success); }
+.debug-ai-call-updates { margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--lore-border-light); }
 .debug-ai-update-item {
-  display: flex; gap: 8px; font-size: 10px; padding: 2px 0;
+  display: flex; gap: 8px; font-size: 12px; padding: 3px 0;
 }
-.debug-ai-update-item::before { content: '├'; color: var(--lore-text-secondary); }
-.debug-ai-update-name { color: var(--lore-accent); font-weight: 600; }
+.debug-ai-update-name { color: var(--lore-accent); font-weight: 500; }
 .debug-ai-update-reason { color: var(--lore-text-secondary); }
 
 /* 日志 */
-.debug-log-actions { display: flex; gap: 2px; }
+.debug-log-actions { display: flex; gap: 4px; }
 .debug-action-btn {
-  background: none; border: none; font-size: 12px; cursor: pointer;
-  padding: 2px 4px; border-radius: 4px; transition: background 0.15s;
+  background: var(--lore-bg-primary); border: none; font-size: 14px; cursor: pointer;
+  padding: 4px 6px; border-radius: var(--lore-radius-sm); transition: background 0.15s;
+  min-width: 32px; min-height: 32px; /* 触控最小区域 */
+  display: flex; align-items: center; justify-content: center;
 }
-.debug-action-btn:hover { background: var(--lore-bg-tertiary); }
-.debug-log-filters { display: flex; gap: 4px; margin-bottom: 8px; }
+.debug-action-btn:hover { background: var(--lore-border-light); }
+.debug-log-filters { display: flex; gap: 6px; margin-bottom: 12px; }
 .debug-filter-btn {
-  padding: 3px 8px; border-radius: 6px; border: 1px solid var(--lore-border);
-  background: none; color: var(--lore-text-secondary);
-  font-size: 10px; cursor: pointer; transition: all 0.15s;
-  text-transform: uppercase;
+  padding: 4px 10px; border-radius: 12px; border: 1px solid var(--lore-border-light);
+  background: transparent; color: var(--lore-text-secondary);
+  font-size: 11px; cursor: pointer; transition: all 0.15s;
+  text-transform: uppercase; font-weight: 500;
 }
-.debug-filter-btn.active { background: var(--lore-accent-bg); color: var(--lore-accent); border-color: var(--lore-accent); }
-.debug-filter-btn:hover { color: var(--lore-text-primary); }
+.debug-filter-btn.active { background: var(--lore-accent); color: #fff; border-color: var(--lore-accent); }
+.debug-filter-btn:hover:not(.active) { color: var(--lore-text-primary); border-color: var(--lore-text-tertiary); }
 
-.debug-logs-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.debug-logs-list { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 
 /* 复用日志条目样式 */
 .log-entry {
-  display: flex; gap: 6px; padding: 3px 6px;
-  font-size: 10px; font-family: 'Consolas', monospace;
-  border-radius: 3px; align-items: baseline;
+  display: flex; gap: 8px; padding: 6px 8px;
+  font-size: 12px; font-family: -apple-system, monospace;
+  border-radius: var(--lore-radius-sm); align-items: baseline; line-height: 1.4;
 }
-.log-time { color: var(--lore-text-secondary); flex-shrink: 0; }
-.log-level { font-weight: 700; flex-shrink: 0; min-width: 40px; }
-.log-source { color: var(--lore-accent); flex-shrink: 0; font-size: 9px; opacity: 0.8; }
-.log-msg { color: var(--lore-text-primary); word-break: break-all; }
+.log-time { color: var(--lore-text-tertiary); flex-shrink: 0; }
+.log-level { font-weight: 600; flex-shrink: 0; min-width: 44px; }
+.log-source { color: var(--lore-accent); flex-shrink: 0; font-size: 11px; opacity: 0.8; font-weight: 500;}
+.log-msg { color: var(--lore-text-primary); word-break: break-word; overflow-wrap: break-word; }
 
-.log-debug .log-level { color: #888; }
-.log-info .log-level { color: #7eb8da; }
-.log-warn { background: rgba(255,200,50,.06); }
-.log-warn .log-level { color: #e8b830; }
-.log-error { background: rgba(255,80,80,.08); }
-.log-error .log-level { color: #e85050; }
+.log-debug .log-level { color: var(--lore-text-tertiary); }
+.log-info .log-level { color: var(--lore-accent); }
+.log-warn { background: rgba(255, 149, 0, 0.1); }
+.log-warn .log-level { color: #ff9500; }
+.log-error { background: var(--lore-danger-bg); }
+.log-error .log-level { color: var(--lore-danger); }
 
-.debug-empty { font-size: 11px; color: var(--lore-text-secondary); text-align: center; padding: 16px; }
+.debug-empty { font-size: 13px; color: var(--lore-text-secondary); text-align: center; padding: 20px; }
 </style>

@@ -23,7 +23,13 @@ const PresetDataSchema = z.object({
   lore_target_worldbooks: z.array(z.string()).default([]),
   lore_scan_interval: z.number().default(1),
   lore_constraints: z.array(LoreConstraintSchema).default([]),
-  // 未来的业务字段在此扩展
+  // AI 行为配置（不包含敏感的 API 密钥和地址）
+  lore_ai_mode: z.enum(['onepass', 'twopass']).default('onepass'),
+  lore_ai_system_prompt: z.string().default(''),
+  lore_ai_max_context: z.number().default(10),
+  lore_scan_trigger: z.enum(['auto', 'manual']).default('manual'),
+  lore_api_format: z.enum(['openai']).default('openai'),
+  lore_api_model: z.string().default(''),
 });
 export type PresetData = z.infer<typeof PresetDataSchema>;
 
@@ -62,6 +68,18 @@ const LorevnterSettings = z
     /** 触发模式 */
     lore_scan_trigger: z.enum(['auto', 'manual']).default('manual'),
 
+    // ── AI API 连接配置（不纳入预设） ──
+    /** API 格式（当前仅 OpenAI 兼容） */
+    lore_api_format: z.enum(['openai']).default('openai'),
+    /** API 来源: tavern=复用酒馆连接, custom=自定义端点 */
+    lore_api_source: z.enum(['tavern', 'custom']).default('tavern'),
+    /** 自定义 API Base URL（仅 source=custom 时生效） */
+    lore_api_base_url: z.string().default(''),
+    /** 自定义 API Key（仅 source=custom 时生效） */
+    lore_api_key: z.string().default(''),
+    /** 模型名称（两种模式共用，tavern 模式下覆盖酒馆默认模型） */
+    lore_api_model: z.string().default(''),
+
     // ── 预设列表 ──
     lore_presets: z.array(PresetSchema).default([]),
   })
@@ -75,6 +93,13 @@ function extractPresetData(settings: LorevnterSettingsType): PresetData {
     lore_target_worldbooks: settings.lore_target_worldbooks,
     lore_scan_interval: settings.lore_scan_interval,
     lore_constraints: settings.lore_constraints,
+    lore_ai_mode: settings.lore_ai_mode,
+    lore_ai_system_prompt: settings.lore_ai_system_prompt,
+    lore_ai_max_context: settings.lore_ai_max_context,
+    lore_scan_trigger: settings.lore_scan_trigger,
+    lore_api_format: settings.lore_api_format,
+    lore_api_model: settings.lore_api_model,
+    // 注意：严格排除 lore_api_key 和 lore_api_base_url
   };
 }
 
@@ -83,6 +108,13 @@ function applyPresetData(settings: LorevnterSettingsType, data: PresetData): voi
   settings.lore_target_worldbooks = data.lore_target_worldbooks;
   settings.lore_scan_interval = data.lore_scan_interval;
   settings.lore_constraints = data.lore_constraints;
+  settings.lore_ai_mode = data.lore_ai_mode;
+  settings.lore_ai_system_prompt = data.lore_ai_system_prompt;
+  settings.lore_ai_max_context = data.lore_ai_max_context;
+  settings.lore_scan_trigger = data.lore_scan_trigger;
+  settings.lore_api_format = data.lore_api_format;
+  settings.lore_api_model = data.lore_api_model;
+  // 注意：不覆盖 lore_api_key 和 lore_api_base_url
 }
 
 /** 设置 Store */

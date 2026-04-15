@@ -64,93 +64,66 @@ function onRefresh() {
 
 <style scoped>
 .context-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  margin: 0 16px;
   background: var(--lore-bg-secondary);
-  border-bottom: 1px solid var(--lore-border);
-  min-height: 36px;
+  border-radius: var(--lore-radius-md);
+  border: 1px solid var(--lore-border-light);
+  min-height: 40px;
 }
 
 .context-bar-content {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  overflow: hidden;
+  flex: 1; display: flex; align-items: center; gap: 10px; overflow: hidden;
 }
 
 .context-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
 }
 
-.context-icon {
-  font-size: 14px;
-}
+.context-icon { font-size: 16px; }
 
 .context-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--lore-text-primary);
-  white-space: nowrap;
+  font-size: 14px; font-weight: 600; color: var(--lore-text-primary);
+  white-space: nowrap; letter-spacing: -0.2px;
 }
 
 .context-detail {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  overflow-x: auto;
-  flex: 1;
+  display: flex; align-items: center; gap: 6px; overflow-x: auto; flex: 1;
+  -ms-overflow-style: none; scrollbar-width: none; /* 隐藏滚动条 */
 }
+.context-detail::-webkit-scrollbar { display: none; }
 
 .context-chip {
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: var(--lore-accent-bg);
-  color: var(--lore-accent);
-  white-space: nowrap;
-  flex-shrink: 0;
+  font-size: 11px; padding: 3px 10px; border-radius: 12px;
+  background: var(--lore-accent-bg); color: var(--lore-accent);
+  white-space: nowrap; flex-shrink: 0; font-weight: 500;
 }
 
 .context-chip-secondary {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--lore-text-secondary);
+  background: var(--lore-bg-primary); color: var(--lore-text-secondary);
 }
 
 .context-chip-global {
-  background: rgba(80, 200, 120, 0.1);
-  color: #50c878;
+  background: var(--lore-danger-bg); color: var(--lore-danger);
 }
 
 .context-idle-hint {
-  font-size: 11px;
-  color: var(--lore-text-secondary);
-  font-style: italic;
+  font-size: 13px; color: var(--lore-text-secondary); font-style: italic;
 }
 
 .context-refresh {
-  background: none;
-  border: none;
-  font-size: 12px;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-  transition: all 0.2s ease-out;
-  flex-shrink: 0;
+  background: var(--lore-bg-primary); border: none; font-size: 14px;
+  cursor: pointer; padding: 8px;
+  border-radius: 50%;
+  color: var(--lore-accent);
+  transition: all 0.2s ease-out; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  min-width: 32px; min-height: 32px; /* 确保触控区域足够 */
 }
 
-.context-refresh:hover {
-  background: var(--lore-bg-tertiary);
-}
-
-.context-refresh.spinning {
-  animation: lore-spin 0.6s linear infinite;
-}
+.context-refresh:hover { background: var(--lore-border-light); }
+.context-refresh.spinning { animation: lore-spin 0.6s linear infinite; }
 
 @keyframes lore-spin {
   from { transform: rotate(0deg); }

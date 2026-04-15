@@ -1,6 +1,151 @@
-// Lorevnter 样式入口
-// 后续在此添加全局样式
+// ============================================================
+// Lorevnter 全局样式与 iOS 设计系统
+// ============================================================
 
 :root {
-  --lore-accent: #7c5bf0;
+  // --------- iOS Light Theme ---------
+  --lore-bg-primary: #F2F2F7;       // systemGroupedBackground
+  --lore-bg-secondary: #FFFFFF;     // secondarySystemGroupedBackground
+  --lore-bg-tertiary: #FFFFFF;      // For cards/modals
+  
+  --lore-text-primary: #000000;
+  --lore-text-secondary: #8E8E93;   // systemGray
+  --lore-text-tertiary: #C7C7CC;    // systemGray4
+  
+  --lore-border: #C6C6C8;           // Opaque separator
+  --lore-border-light: rgba(60, 60, 67, 0.15); 
+  
+  --lore-accent: #007AFF;           // iOS Blue
+  --lore-accent-bg: rgba(0, 122, 255, 0.1);
+  --lore-success: #34C759;          // iOS Green
+  --lore-success-bg: rgba(52, 199, 89, 0.12);
+  --lore-danger: #FF3B30;           // iOS Red
+  --lore-danger-bg: rgba(255, 59, 48, 0.1);
+
+  --lore-overlay: rgba(0, 0, 0, 0.4);
+  --lore-glass-bg: rgba(255, 255, 255, 0.85);
+
+  --lore-radius-lg: 14px;
+  --lore-radius-md: 10px;
+  --lore-radius-sm: 8px;
+}
+
+[data-lore-theme="dark"] {
+  // --------- iOS Dark Theme ---------
+  --lore-bg-primary: #000000;       // systemBackground
+  --lore-bg-secondary: #1C1C1E;     // secondarySystemGroupedBackground
+  --lore-bg-tertiary: #2C2C2E;      // tertiarySystemGroupedBackground
+  
+  --lore-text-primary: #FFFFFF;
+  --lore-text-secondary: #8E8E93;
+  --lore-text-tertiary: #636366;    // systemGray3（修复：原 #3A3A3C 太暗）
+  
+  --lore-border: #38383A;
+  --lore-border-light: rgba(84, 84, 88, 0.35);
+
+  --lore-accent: #0A84FF;
+  --lore-accent-bg: rgba(10, 132, 255, 0.15);
+  --lore-success: #30D158;
+  --lore-success-bg: rgba(48, 209, 88, 0.15);
+  --lore-danger: #FF453A;
+  --lore-danger-bg: rgba(255, 69, 58, 0.15);
+
+  --lore-overlay: rgba(0, 0, 0, 0.6);
+  --lore-glass-bg: rgba(28, 28, 30, 0.85);
+}
+
+// Auto 模式：跟随系统深色偏好
+@media (prefers-color-scheme: dark) {
+  [data-lore-theme="auto"] {
+    --lore-bg-primary: #000000;
+    --lore-bg-secondary: #1C1C1E;
+    --lore-bg-tertiary: #2C2C2E;
+    
+    --lore-text-primary: #FFFFFF;
+    --lore-text-secondary: #8E8E93;
+    --lore-text-tertiary: #636366;
+    
+    --lore-border: #38383A;
+    --lore-border-light: rgba(84, 84, 88, 0.35);
+
+    --lore-accent: #0A84FF;
+    --lore-accent-bg: rgba(10, 132, 255, 0.15);
+    --lore-success: #30D158;
+    --lore-success-bg: rgba(48, 209, 88, 0.15);
+    --lore-danger: #FF453A;
+    --lore-danger-bg: rgba(255, 69, 58, 0.15);
+
+    --lore-overlay: rgba(0, 0, 0, 0.6);
+    --lore-glass-bg: rgba(28, 28, 30, 0.85);
+  }
+}
+
+/* --- 基础重置 --- */
+.lorevnter-overlay *, .lorevnter-overlay *::before, .lorevnter-overlay *::after {
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+}
+
+/* --- iOS 风格 Toggle 开关 --- */
+.ios-toggle {
+  appearance: none; -webkit-appearance: none;
+  width: 50px; height: 30px; border-radius: 15px;
+  background-color: var(--lore-border);
+  position: relative; cursor: pointer; outline: none;
+  transition: background-color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  flex-shrink: 0;
+  margin: 0;
+}
+.ios-toggle::after {
+  content: ''; position: absolute;
+  top: 2px; left: 2px; width: 26px; height: 26px;
+  background-color: #fff; border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ios-toggle:checked { background-color: var(--lore-success); }
+.ios-toggle:checked::after { transform: translateX(20px); }
+
+/* 缩小版 Toggle（用于紧凑列表中的绑定开关） */
+.ios-toggle.ios-toggle-sm {
+  width: 40px; height: 24px; border-radius: 12px;
+}
+.ios-toggle.ios-toggle-sm::after {
+  width: 20px; height: 20px;
+}
+.ios-toggle.ios-toggle-sm:checked::after { transform: translateX(16px); }
+
+/* --- 动画 --- */
+@keyframes lore-slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes lore-slide-up-scale {
+  from { transform: translateY(100%) scale(0.95); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes lore-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 隐藏原生滚动条追求类原生体验 */
+.lorevnter-window ::-webkit-scrollbar {
+  width: 4px; height: 4px;
+}
+.lorevnter-window ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.lorevnter-window ::-webkit-scrollbar-thumb {
+  background: var(--lore-border); border-radius: 4px;
+}
+.lorevnter-window ::-webkit-scrollbar-thumb:hover {
+  background: var(--lore-text-secondary);
+}
+/* Firefox 滚动条 */
+.lorevnter-window {
+  scrollbar-width: thin;
+  scrollbar-color: var(--lore-border) transparent;
 }

@@ -56,8 +56,8 @@
             />
           </label>
           <label class="ct-label ct-toggle-label">
-            启用
-            <input type="checkbox" v-model="selected.enabled" class="ct-toggle" />
+            <span>启用约束</span>
+            <input type="checkbox" v-model="selected.enabled" class="ios-toggle" />
           </label>
           <div class="ct-form-actions">
             <button class="ct-btn ct-btn-danger" @click="onDelete">🗑 删除</button>
@@ -84,10 +84,15 @@
         <template v-else>
           <div class="ct-bind-header">
             <span class="ct-bind-wb-name">{{ bindWorldbook }}</span>
-            <button class="ct-btn ct-btn-small" @click="bindWorldbook = null">← 返回</button>
+            <div class="ct-bind-header-actions">
+              <button class="ct-btn ct-btn-small ct-btn-outline" @click="isBindListExpanded = !isBindListExpanded">
+                {{ isBindListExpanded ? '收起列表' : '展开条目' }}
+              </button>
+              <button class="ct-btn ct-btn-small" @click="bindWorldbook = null">← 返回</button>
+            </div>
           </div>
           <div v-if="bindLoading" class="ct-loading">加载中...</div>
-          <div v-else class="ct-bind-entries">
+          <div v-else v-show="isBindListExpanded" class="ct-bind-entries">
             <label
               v-for="entry in bindEntries"
               :key="entry.uid"
@@ -95,9 +100,11 @@
             >
               <input
                 type="checkbox"
+                class="ios-toggle ios-toggle-sm"
                 :checked="entry.extra?.lore_constraint_id === selected.id"
                 @change="onToggleBind(entry, $event)"
               />
+              <span class="ct-bind-entry-strategy">{{ getStrategyIcon(entry) }}</span>
               <span class="ct-bind-entry-name">{{ entry.name || '(未命名)' }}</span>
               <span v-if="entry.extra?.lore_macro" class="ct-bind-entry-macro">{{ formatMacro(entry) }}</span>
               <span v-if="isBoundToOther(entry)" class="ct-bind-entry-other">
@@ -183,6 +190,18 @@ const worldbookNames = ref<string[]>([]);
 const bindWorldbook = ref<string | null>(null);
 const bindEntries = ref<WorldbookEntry[]>([]);
 const bindLoading = ref(false);
+const isBindListExpanded = ref(true); // 仅控制 UI 折叠
+
+// ── 蓝灯/绿灯策略图标（纯 UI 辅助） ──
+function getStrategyIcon(entry: WorldbookEntry): string {
+  if (!entry.enabled) return '⚫';
+  switch (entry.strategy?.type) {
+    case 'constant': return '🔵';
+    case 'selective': return '🟢';
+    case 'vectorized': return '🔗';
+    default: return '●';
+  }
+}
 
 onMounted(() => {
   worldbookNames.value = WorldbookAPI.listAll();
@@ -233,95 +252,104 @@ function isBoundToOther(entry: WorldbookEntry): boolean {
 
 .ct-section {
   background: var(--lore-bg-secondary);
-  border-radius: 12px;
-  padding: 14px;
-  border: 1px solid var(--lore-border);
+  border-radius: var(--lore-radius-lg);
+  padding: 16px;
+  border: 1px solid var(--lore-border-light);
 }
 .ct-section-title {
-  font-size: 11px; font-weight: 600; color: var(--lore-text-secondary);
-  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+  font-size: 13px; font-weight: 500; color: var(--lore-text-secondary);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;
 }
 
-/* 约束卡片列表 */
-.ct-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+/* 约束卡片列表 - 堆叠效果 */
+.ct-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; }
 .ct-card {
-  padding: 10px 12px; border-radius: 10px;
-  background: var(--lore-bg-tertiary); border: 1px solid transparent;
-  cursor: pointer; transition: all 0.2s ease-out;
+  padding: 12px 14px; border-radius: var(--lore-radius-md);
+  background: var(--lore-bg-primary); border: 2px solid transparent;
+  cursor: pointer; transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  min-height: 44px; /* 触控最小区域 */
 }
-.ct-card:hover { border-color: var(--lore-border); }
+.ct-card:hover { transform: scale(0.99); }
 .ct-card.active { border-color: var(--lore-accent); background: var(--lore-accent-bg); }
 .ct-card.disabled { opacity: 0.5; }
 .ct-card-header { display: flex; align-items: center; gap: 6px; }
-.ct-card-icon { font-size: 14px; }
-.ct-card-name { font-size: 12px; font-weight: 600; color: var(--lore-text-primary); flex: 1; }
-.ct-card-refs { font-size: 10px; color: var(--lore-text-secondary); }
-.ct-card-preview { font-size: 11px; color: var(--lore-text-secondary); margin-top: 4px; line-height: 1.3; }
+.ct-card-icon { font-size: 16px; }
+.ct-card-name { font-size: 15px; font-weight: 500; color: var(--lore-text-primary); flex: 1; letter-spacing: -0.2px; }
+.ct-card-refs { font-size: 12px; color: var(--lore-text-secondary); }
+.ct-card-preview { font-size: 13px; color: var(--lore-text-secondary); margin-top: 6px; line-height: 1.4; }
 .ct-skip-hint { font-style: italic; }
 
-.ct-actions { margin-top: 8px; }
+.ct-actions { margin-top: 12px; }
 
-/* 表单 */
-.ct-form { display: flex; flex-direction: column; gap: 10px; }
-.ct-label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--lore-text-secondary); }
+/* 表单 - iOS Inset 风格 */
+.ct-form { display: flex; flex-direction: column; gap: 14px; }
+.ct-label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--lore-text-secondary); font-weight: 500; }
 .ct-input, .ct-select, .ct-textarea {
-  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--lore-border);
+  padding: 10px 12px; border-radius: var(--lore-radius-sm); border: 1px solid var(--lore-border-light);
   background: var(--lore-bg-primary); color: var(--lore-text-primary);
-  font-size: 12px; outline: none; transition: border-color 0.2s;
+  font-size: 15px; outline: none; transition: border-color 0.2s;
 }
 .ct-input:focus, .ct-select:focus, .ct-textarea:focus { border-color: var(--lore-accent); }
-.ct-textarea { resize: vertical; font-family: 'Consolas', monospace; line-height: 1.4; }
-.ct-toggle-label { flex-direction: row; align-items: center; gap: 8px; }
-.ct-toggle { width: 36px; height: 20px; cursor: pointer; }
-.ct-form-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.ct-textarea { resize: vertical; font-family: -apple-system, monospace; line-height: 1.4; }
+.ct-toggle-label { flex-direction: row; align-items: center; justify-content: space-between; font-size: 15px; color: var(--lore-text-primary); padding: 4px 0;}
+.ct-form-actions { display: flex; justify-content: flex-end; margin-top: 4px; }
 
 /* 条目绑定 */
-.ct-bind-select { display: flex; flex-direction: column; gap: 8px; }
-.ct-bind-hint { font-size: 11px; color: var(--lore-text-secondary); }
-.ct-bind-list { display: flex; flex-wrap: wrap; gap: 4px; }
-.ct-bind-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.ct-bind-wb-name { font-size: 12px; font-weight: 600; color: var(--lore-text-primary); }
-.ct-bind-entries { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+.ct-bind-select { display: flex; flex-direction: column; gap: 10px; }
+.ct-bind-hint { font-size: 13px; color: var(--lore-text-secondary); margin-bottom: 4px;}
+.ct-bind-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.ct-bind-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--lore-border-light);}
+.ct-bind-header-actions { display: flex; gap: 8px; }
+.ct-bind-wb-name { font-size: 15px; font-weight: 600; color: var(--lore-text-primary); }
+.ct-bind-entries { display: flex; flex-direction: column; max-height: 250px; overflow-y: auto; background: var(--lore-bg-primary); border-radius: var(--lore-radius-md); padding: 4px 0;}
 .ct-bind-entry {
-  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
-  border-radius: 8px; cursor: pointer; transition: background 0.15s;
-  font-size: 12px; color: var(--lore-text-primary);
+  display: flex; align-items: center; gap: 14px; padding: 12px 14px;
+  cursor: pointer; transition: background 0.15s;
+  font-size: 15px; color: var(--lore-text-primary);
+  border-bottom: 1px solid var(--lore-border-light);
+  min-height: 44px; /* 触控最小区域 */
 }
+.ct-bind-entry:last-child { border-bottom: none; }
 .ct-bind-entry:hover { background: var(--lore-bg-tertiary); }
-.ct-bind-entry-name { flex: 1; }
-.ct-bind-entry-macro { font-size: 10px; color: var(--lore-accent); font-family: monospace; }
-.ct-bind-entry-other { font-size: 10px; color: var(--lore-text-secondary); font-style: italic; }
+.ct-bind-entry-name { flex: 1; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ct-bind-entry-strategy { font-size: 12px; flex-shrink: 0; }
+.ct-bind-entry-macro { font-size: 12px; color: var(--lore-accent); font-family: monospace; background: var(--lore-accent-bg); padding: 2px 6px; border-radius: 6px;}
+.ct-bind-entry-other { font-size: 12px; color: var(--lore-text-tertiary); font-style: italic; }
 
 /* 按钮 */
 .ct-btn {
-  padding: 6px 14px; border-radius: 8px; border: 1px solid var(--lore-border);
-  background: var(--lore-bg-secondary); color: var(--lore-text-secondary);
-  font-size: 12px; cursor: pointer; transition: all 0.15s;
+  padding: 10px 16px; border-radius: var(--lore-radius-md); border: none;
+  background: var(--lore-bg-tertiary); color: var(--lore-text-primary);
+  font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
-.ct-btn:hover { background: var(--lore-bg-tertiary); color: var(--lore-text-primary); }
+.ct-btn:active { transform: scale(0.98); }
 .ct-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.ct-btn-accent { border-color: var(--lore-accent); color: var(--lore-accent); }
-.ct-btn-accent:hover { background: var(--lore-accent-bg); }
-.ct-btn-outline { border-color: var(--lore-border); }
-.ct-btn-danger { border-color: #e85050; color: #e85050; }
-.ct-btn-danger:hover { background: rgba(232, 80, 80, 0.1); }
-.ct-btn-small { padding: 4px 10px; font-size: 11px; }
+.ct-btn-accent { background: var(--lore-accent); color: #fff; }
+.ct-btn-accent:active { filter: brightness(0.9); }
+.ct-btn-outline { background: var(--lore-bg-primary); border: 1px solid var(--lore-border-light); }
+.ct-btn-danger { color: var(--lore-danger); background: var(--lore-danger-bg); }
+.ct-btn-small { padding: 6px 12px; font-size: 13px; border-radius: var(--lore-radius-sm); }
 
-/* 对话框 */
+/* iOS Action Sheet 底部对话框 */
 .ct-dialog-overlay {
-  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-  background: rgba(0, 0, 0, 0.5); z-index: 100001;
-  display: flex; align-items: center; justify-content: center;
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: var(--lore-overlay); z-index: 10; /* 仅覆盖主面板内容，不遗挡酒馆 UI */
+  display: flex; flex-direction: column; justify-content: flex-end;
+  border-radius: var(--lore-radius-lg) var(--lore-radius-lg) 0 0;
+  overflow: hidden; animation: lore-fade-in 0.2s ease-out;
 }
 .ct-dialog {
-  background: var(--lore-bg-primary); border-radius: 14px;
-  padding: 20px; width: min(90vw, 360px);
-  border: 1px solid var(--lore-border);
-  display: flex; flex-direction: column; gap: 12px;
+  background: var(--lore-bg-primary); border-radius: 20px 20px 0 0;
+  padding: 24px 20px 40px; width: 100%;
+  display: flex; flex-direction: column; gap: 16px;
+  animation: lore-slide-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
 }
-.ct-dialog-title { font-size: 14px; font-weight: 700; color: var(--lore-text-primary); }
-.ct-dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.ct-dialog-title { font-size: 17px; font-weight: 600; color: var(--lore-text-primary); text-align: center; margin-bottom: 4px;}
+.ct-dialog-actions { display: flex; gap: 12px; margin-top: 8px;}
+.ct-dialog-actions .ct-btn { flex: 1; padding: 12px; font-size: 15px;}
 
-.ct-empty { font-size: 12px; color: var(--lore-text-secondary); text-align: center; padding: 20px; }
-.ct-loading { font-size: 12px; color: var(--lore-accent); text-align: center; padding: 16px; }
+.ct-empty { font-size: 14px; color: var(--lore-text-secondary); text-align: center; padding: 24px; }
+.ct-loading { font-size: 14px; color: var(--lore-accent); text-align: center; padding: 20px; }
 </style>

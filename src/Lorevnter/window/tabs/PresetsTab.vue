@@ -21,11 +21,16 @@
         <div v-if="preset.description" class="preset-card-desc">{{ preset.description }}</div>
         <div class="preset-card-data">
           <span class="preset-data-tag">世界书: {{ preset.data.lore_target_worldbooks.length }} 个</span>
+          <span class="preset-data-tag">约束: {{ preset.data.lore_constraints?.length ?? 0 }}</span>
           <span class="preset-data-tag">间隔: {{ preset.data.lore_scan_interval }}</span>
+          <span class="preset-data-tag">{{ preset.data.lore_ai_mode === 'twopass' ? '两次调用' : '一次调用' }}</span>
+          <span v-if="preset.data.lore_api_model" class="preset-data-tag">模型: {{ preset.data.lore_api_model }}</span>
         </div>
         <div class="preset-card-actions">
-          <button class="preset-btn preset-btn-sm" @click="onApply(i)">📥 应用</button>
-          <button class="preset-btn preset-btn-sm" @click="onExport(i)">📤 导出</button>
+          <div class="preset-action-group">
+            <button class="preset-btn preset-btn-sm preset-btn-accent" @click="onApply(i)">📥 应用</button>
+            <button class="preset-btn preset-btn-sm" @click="onExport(i)">📤 导出</button>
+          </div>
           <button
             v-if="confirmDeleteIndex !== i"
             class="preset-btn preset-btn-sm preset-btn-danger"
@@ -45,8 +50,17 @@
     <!-- 导入 -->
     <div class="preset-import-section">
       <div class="preset-section-title">导入预设</div>
-      <textarea v-model="importJson" class="preset-textarea" placeholder="粘贴预设 JSON..." rows="3"></textarea>
-      <button class="preset-btn" :disabled="!importJson.trim()" @click="onImport">📋 导入</button>
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept=".json"
+        style="display: none"
+        @change="onFileSelected"
+      />
+      <button class="preset-btn preset-btn-import" @click="fileInputRef?.click()">
+        📂 选择预设文件
+      </button>
+      <span class="preset-import-hint">支持 .json 格式</span>
     </div>
   </div>
 </template>
@@ -60,8 +74,8 @@ const settingsStore = useSettingsStore();
 
 const newName = ref('');
 const newDesc = ref('');
-const importJson = ref('');
 const confirmDeleteIndex = ref(-1);
+const fileInputRef = ref<HTMLInputElement | null>(null);
 
 function onSave() {
   if (!newName.value.trim()) return;
@@ -95,15 +109,28 @@ function onExport(index: number) {
   toastr.success('预设已导出');
 }
 
-function onImport() {
-  if (!importJson.value.trim()) return;
-  const ok = settingsStore.importPreset(importJson.value.trim());
-  if (ok) {
-    importJson.value = '';
-    toastr.success('预设已导入');
-  } else {
-    toastr.error('导入失败，请检查 JSON 格式');
-  }
+function onFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = reader.result as string;
+    const ok = settingsStore.importPreset(text);
+    if (ok) {
+      toastr.success(`预设已导入: ${file.name}`);
+    } else {
+      toastr.error('导入失败，请检查文件格式');
+    }
+    // 清空 input，允许重复选择同一文件
+    input.value = '';
+  };
+  reader.onerror = () => {
+    toastr.error('文件读取失败');
+    input.value = '';
+  };
+  reader.readAsText(file);
 }
 
 function formatDate(iso: string): string {
@@ -117,62 +144,74 @@ function formatDate(iso: string): string {
 </script>
 
 <style scoped>
-.preset-tab { display: flex; flex-direction: column; gap: 14px; }
+.preset-tab { display: flex; flex-direction: column; gap: 20px; padding: 4px; }
 
 .preset-section-title {
-  font-size: 11px; font-weight: 600; color: var(--lore-text-secondary);
-  text-transform: uppercase; letter-spacing: 0.5px;
+  font-size: 13px; font-weight: 500; color: var(--lore-text-secondary);
+  text-transform: uppercase; letter-spacing: 0.5px; padding-left: 12px; margin-bottom: 6px;
 }
 
-.preset-save-section { display: flex; flex-direction: column; gap: 6px; }
-.preset-save-form { display: flex; gap: 6px; flex-wrap: wrap; }
+.preset-save-section, .preset-import-section { display: flex; flex-direction: column; }
+.preset-save-form { 
+  display: flex; flex-direction: column; gap: 8px; 
+  padding: 12px; background: var(--lore-bg-secondary);
+  border-radius: var(--lore-radius-md); border: 1px solid var(--lore-border-light);
+}
 .preset-input {
-  flex: 1; min-width: 120px; padding: 6px 10px; border-radius: 6px;
-  border: 1px solid var(--lore-border); background: var(--lore-bg-secondary);
-  color: var(--lore-text-primary); font-size: 12px; outline: none;
+  width: 100%; padding: 10px 14px; border-radius: var(--lore-radius-sm);
+  border: 1px solid var(--lore-border-light); background: var(--lore-bg-primary);
+  color: var(--lore-text-primary); font-size: 15px; outline: none;
   transition: border-color .15s;
 }
 .preset-input:focus { border-color: var(--lore-accent); }
-.preset-input::placeholder { color: var(--lore-text-secondary); opacity: 0.6; }
+.preset-input::placeholder { color: var(--lore-text-tertiary); }
 
 .preset-btn {
-  padding: 6px 12px; border-radius: 6px; border: 1px solid var(--lore-border);
-  background: var(--lore-bg-secondary); color: var(--lore-text-secondary);
-  font-size: 12px; cursor: pointer; transition: all .15s; white-space: nowrap;
+  padding: 10px; border-radius: var(--lore-radius-sm); border: none;
+  background: var(--lore-bg-tertiary); color: var(--lore-accent);
+  font-size: 15px; font-weight: 500; cursor: pointer; transition: all .15s;
 }
-.preset-btn:hover:not(:disabled) { background: var(--lore-bg-tertiary); color: var(--lore-text-primary); }
+.preset-btn:hover:not(:disabled) { background: var(--lore-bg-primary); }
+.preset-btn:active:not(:disabled) { transform: scale(0.98); }
 .preset-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.preset-btn-accent { border-color: var(--lore-accent); color: var(--lore-accent); }
-.preset-btn-accent:hover:not(:disabled) { background: var(--lore-accent-bg); }
-.preset-btn-sm { padding: 3px 8px; font-size: 11px; }
-.preset-btn-danger { color: #e85050; border-color: rgba(232,80,80,.3); }
-.preset-btn-danger:hover { background: rgba(232,80,80,.1); }
+.preset-btn-accent { background: var(--lore-accent); color: #fff; }
+.preset-btn-accent:hover:not(:disabled) { opacity: 0.9; }
+.preset-btn-sm { padding: 6px 10px; font-size: 13px; }
+.preset-btn-danger { color: var(--lore-danger); }
+.preset-btn-danger:hover { background: var(--lore-danger-bg); }
 
-.preset-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+.preset-list { display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto; padding-right: 4px; }
 .preset-card {
-  padding: 10px 12px; border-radius: 8px; background: var(--lore-bg-secondary);
-  border: 1px solid var(--lore-border); display: flex; flex-direction: column; gap: 6px;
+  padding: 16px; border-radius: var(--lore-radius-md); background: var(--lore-bg-secondary);
+  border: 1px solid var(--lore-border-light); display: flex; flex-direction: column; gap: 10px;
 }
-.preset-card-header { display: flex; align-items: center; justify-content: space-between; }
-.preset-card-name { font-size: 13px; font-weight: 600; color: var(--lore-text-primary); }
-.preset-card-date { font-size: 10px; color: var(--lore-text-secondary); }
-.preset-card-desc { font-size: 11px; color: var(--lore-text-secondary); }
-.preset-card-data { display: flex; gap: 6px; flex-wrap: wrap; }
+.preset-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: -4px;}
+.preset-card-name { font-size: 16px; font-weight: 600; color: var(--lore-text-primary); letter-spacing: -0.3px;}
+.preset-card-date { font-size: 12px; color: var(--lore-text-secondary); }
+.preset-card-desc { font-size: 14px; color: var(--lore-text-secondary); line-height: 1.4; }
+.preset-card-data { display: flex; gap: 8px; flex-wrap: wrap; }
 .preset-data-tag {
-  font-size: 10px; padding: 2px 6px; border-radius: 3px;
-  background: var(--lore-bg-tertiary); color: var(--lore-text-secondary);
+  font-size: 12px; padding: 4px 8px; border-radius: 6px;
+  background: var(--lore-bg-primary); color: var(--lore-text-secondary); font-weight: 500;
 }
-.preset-card-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.preset-card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px;}
+.preset-action-group { display: flex; gap: 8px; flex: 1; min-width: max-content; }
+.preset-action-group .preset-btn { flex: 1; }
+.preset-btn-danger { margin-left: auto; background: transparent; color: var(--lore-text-secondary); }
+.preset-btn-danger:hover { background: var(--lore-danger-bg); color: var(--lore-danger); }
 
-.preset-import-section { display: flex; flex-direction: column; gap: 6px; }
-.preset-textarea {
-  padding: 8px 10px; border-radius: 6px; border: 1px solid var(--lore-border);
-  background: var(--lore-bg-secondary); color: var(--lore-text-primary);
-  font-size: 11px; font-family: 'Consolas', monospace; resize: vertical;
-  outline: none; min-height: 50px;
+.preset-import-section { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.preset-btn-import {
+  width: 100%; padding: 16px; text-align: center;
+  background: var(--lore-bg-secondary); border: 2px dashed var(--lore-border-light);
+  border-radius: var(--lore-radius-md); color: var(--lore-accent);
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s;
+  min-height: 52px; /* 移动端触控友好 */
 }
-.preset-textarea:focus { border-color: var(--lore-accent); }
-.preset-textarea::placeholder { color: var(--lore-text-secondary); opacity: 0.6; }
+.preset-btn-import:hover { border-color: var(--lore-accent); background: var(--lore-accent-bg); }
+.preset-btn-import:active { transform: scale(0.98); }
+.preset-import-hint { font-size: 12px; color: var(--lore-text-tertiary); }
 
-.preset-empty { font-size: 12px; color: var(--lore-text-secondary); text-align: center; padding: 20px; }
+.preset-empty { font-size: 14px; color: var(--lore-text-secondary); text-align: center; padding: 20px; }
 </style>

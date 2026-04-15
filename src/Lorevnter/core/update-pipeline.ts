@@ -121,38 +121,38 @@ export async function runUpdatePipeline(): Promise<void> {
       : await analyzeOnePass(request);
 
     // Step 5: 应用更新
-    if (result.updates.length === 0) {
-      logger.info('管线完成: 无需更新');
-      return;
-    }
-
     let appliedCount = 0;
-    for (const update of result.updates) {
-      // 找到条目所属的世界书
-      const targetWb = findWorldbookForEntry(update.entryName, worldbookMap);
-      if (!targetWb) {
-        logger.warn(`找不到条目 "${update.entryName}" 所属的世界书，跳过`);
-        continue;
+
+    if (result.updates.length > 0) {
+      for (const update of result.updates) {
+        // 找到条目所属的世界书
+        const targetWb = findWorldbookForEntry(update.entryName, worldbookMap);
+        if (!targetWb) {
+          logger.warn(`找不到条目 "${update.entryName}" 所属的世界书，跳过`);
+          continue;
+        }
+
+        try {
+          await updateWorldbookWith(targetWb.worldbookName, (entries) =>
+            entries.map((e) =>
+              e.name === update.entryName ? { ...e, content: update.newContent } : e,
+            ),
+          );
+          appliedCount++;
+          logger.info(`已更新: ${update.entryName} (${update.reason})`);
+        } catch (e) {
+          logger.error(`写入失败: ${update.entryName} — ${(e as Error).message}`);
+        }
       }
 
-      try {
-        await updateWorldbookWith(targetWb.worldbookName, (entries) =>
-          entries.map((e) =>
-            e.name === update.entryName ? { ...e, content: update.newContent } : e,
-          ),
-        );
-        appliedCount++;
-        logger.info(`已更新: ${update.entryName} (${update.reason})`);
-      } catch (e) {
-        logger.error(`写入失败: ${update.entryName} — ${(e as Error).message}`);
-      }
+      const names = result.updates.map((u) => u.entryName).join(', ');
+      toastr.success(`已更新 ${appliedCount} 条: ${names}`, 'Lorevnter');
+      logger.info(`管线完成: ${appliedCount}/${result.updates.length} 条已应用`);
+    } else {
+      logger.info('管线完成: 无需更新');
     }
 
-    const names = result.updates.map((u) => u.entryName).join(', ');
-    toastr.success(`已更新 ${appliedCount} 条: ${names}`, 'Lorevnter');
-    logger.info(`管线完成: ${appliedCount}/${result.updates.length} 条已应用`);
-
-    // 记录到 AI 调用历史
+    // 记录到 AI 调用历史（无论是否有更新都记录）
     recordAiCall(request, result, appliedCount);
   } catch (e) {
     logger.error(`管线失败: ${(e as Error).message}`);
