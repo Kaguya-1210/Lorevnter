@@ -7,44 +7,27 @@
         <button class="lorevnter-close" @click="runtime.windowVisible = false">✕</button>
       </div>
 
+      <ContextBar />
+
       <div class="lorevnter-tabs">
         <button :class="{ active: runtime.currentTab === 'worldbooks' }" @click="runtime.currentTab = 'worldbooks'">📖 世界书</button>
+        <button :class="{ active: runtime.currentTab === 'constraints' }" @click="runtime.currentTab = 'constraints'">📐 约束</button>
         <button :class="{ active: runtime.currentTab === 'presets' }" @click="runtime.currentTab = 'presets'">📦 预设</button>
         <button :class="{ active: runtime.currentTab === 'settings' }" @click="runtime.currentTab = 'settings'">⚙ 设置</button>
         <button
           v-show="settings.lore_debug_mode"
           :class="{ active: runtime.currentTab === 'logs' }"
-          @click="onLogsTabClick"
-        >📝 日志</button>
+          @click="runtime.currentTab = 'logs'"
+        >🔧 调试</button>
       </div>
 
       <div class="lorevnter-body">
         <WorldbooksTab v-if="runtime.currentTab === 'worldbooks'" />
+        <ConstraintsTab v-else-if="runtime.currentTab === 'constraints'" />
         <PresetsTab v-else-if="runtime.currentTab === 'presets'" />
         <SettingsTab v-else-if="runtime.currentTab === 'settings'" />
 
-        <!-- 日志（仅 debugMode 下显示） -->
-        <div v-else-if="runtime.currentTab === 'logs'" class="tab-content tab-logs">
-          <div class="logs-toolbar">
-            <span class="logs-count">{{ runtime.logEntries.length }} 条日志</span>
-            <button class="logs-refresh" @click="runtime.refreshLogs()">🔄 刷新</button>
-            <button class="logs-clear" @click="onClearLogs">🗑 清空</button>
-          </div>
-          <div class="logs-list">
-            <div
-              v-for="(entry, i) in runtime.logEntries.slice().reverse()"
-              :key="i"
-              class="log-entry"
-              :class="'log-' + entry.level"
-            >
-              <span class="log-time">{{ formatTime(entry.timestamp) }}</span>
-              <span class="log-level">{{ entry.level.toUpperCase() }}</span>
-              <span class="log-source">{{ entry.source }}</span>
-              <span class="log-msg">{{ entry.message }}</span>
-            </div>
-            <p v-if="runtime.logEntries.length === 0" class="tab-placeholder">暂无日志</p>
-          </div>
-        </div>
+        <DebugTab v-else-if="runtime.currentTab === 'logs'" />
       </div>
     </div>
   </div>
@@ -53,28 +36,15 @@
 <script setup lang="ts">
 import { useSettingsStore } from '../settings';
 import { useRuntimeStore } from '../state';
-import { clearLogBuffer } from '../logger';
+import ContextBar from './components/ContextBar.vue';
 import WorldbooksTab from './tabs/WorldbooksTab.vue';
+import ConstraintsTab from './tabs/ConstraintsTab.vue';
 import PresetsTab from './tabs/PresetsTab.vue';
 import SettingsTab from './tabs/SettingsTab.vue';
+import DebugTab from './tabs/DebugTab.vue';
 
 const { settings } = useSettingsStore();
 const runtime = useRuntimeStore();
-
-function onLogsTabClick() {
-  runtime.currentTab = 'logs';
-  runtime.refreshLogs();
-}
-
-function onClearLogs() {
-  clearLogBuffer();
-  runtime.refreshLogs();
-}
-
-function formatTime(ts: number): string {
-  const d = new Date(ts);
-  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
-}
 </script>
 
 <style scoped>
@@ -150,45 +120,5 @@ function formatTime(ts: number): string {
   text-align: center; padding: 40px 20px;
 }
 
-/* ── 日志 Tab ── */
-.tab-logs { display: flex; flex-direction: column; gap: 8px; }
-.logs-toolbar {
-  display: flex; align-items: center; gap: 8px;
-  padding-bottom: 8px; border-bottom: 1px solid var(--lore-border);
-}
-.logs-count { font-size: 11px; color: var(--lore-text-secondary); flex: 1; }
-.logs-refresh, .logs-clear {
-  background: var(--lore-bg-secondary); border: 1px solid var(--lore-border);
-  color: var(--lore-text-secondary); font-size: 11px; padding: 4px 8px;
-  border-radius: 4px; cursor: pointer; transition: all .15s;
-}
-.logs-refresh:hover, .logs-clear:hover {
-  background: var(--lore-bg-tertiary); color: var(--lore-text-primary);
-}
 
-.logs-list {
-  max-height: 400px; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.log-entry {
-  display: flex; gap: 6px; padding: 3px 6px;
-  font-size: 11px; font-family: 'Consolas', 'Courier New', monospace;
-  border-radius: 3px; align-items: baseline;
-}
-.log-time { color: var(--lore-text-secondary); flex-shrink: 0; }
-.log-level {
-  font-weight: 700; flex-shrink: 0; min-width: 40px;
-}
-.log-source {
-  color: var(--lore-accent); flex-shrink: 0;
-  font-size: 10px; opacity: 0.8;
-}
-.log-msg { color: var(--lore-text-primary); word-break: break-all; }
-
-.log-debug .log-level { color: #888; }
-.log-info .log-level { color: #7eb8da; }
-.log-warn { background: rgba(255,200,50,.06); }
-.log-warn .log-level { color: #e8b830; }
-.log-error { background: rgba(255,80,80,.08); }
-.log-error .log-level { color: #e85050; }
 </style>

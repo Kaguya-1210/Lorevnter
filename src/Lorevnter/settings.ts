@@ -7,11 +7,22 @@ import { createLogger } from './logger';
 
 const logger = createLogger('settings');
 
+// ── 约束 Schema ──
+const LoreConstraintSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.enum(['prompt', 'skip']),
+  instruction: z.string().default(''),
+  enabled: z.boolean().default(true),
+});
+export type LoreConstraint = z.infer<typeof LoreConstraintSchema>;
+
 // ── 预设业务数据子集 ──
 // 预设只快照这些字段，不包含主题/调试/开关等设置项
 const PresetDataSchema = z.object({
   lore_target_worldbooks: z.array(z.string()).default([]),
   lore_scan_interval: z.number().default(1),
+  lore_constraints: z.array(LoreConstraintSchema).default([]),
   // 未来的业务字段在此扩展
 });
 export type PresetData = z.infer<typeof PresetDataSchema>;
@@ -38,6 +49,18 @@ const LorevnterSettings = z
     lore_target_worldbooks: z.array(z.string()).default([]),
     /** 扫描间隔（轮） */
     lore_scan_interval: z.number().default(1),
+    /** 约束列表 */
+    lore_constraints: z.array(LoreConstraintSchema).default([]),
+
+    // ── AI 配置（不纳入预设） ──
+    /** AI 分析模式 */
+    lore_ai_mode: z.enum(['onepass', 'twopass']).default('onepass'),
+    /** AI 系统提示词模板 */
+    lore_ai_system_prompt: z.string().default(''),
+    /** AI 最大上下文消息数 */
+    lore_ai_max_context: z.number().default(10),
+    /** 触发模式 */
+    lore_scan_trigger: z.enum(['auto', 'manual']).default('manual'),
 
     // ── 预设列表 ──
     lore_presets: z.array(PresetSchema).default([]),
@@ -51,6 +74,7 @@ function extractPresetData(settings: LorevnterSettingsType): PresetData {
   return {
     lore_target_worldbooks: settings.lore_target_worldbooks,
     lore_scan_interval: settings.lore_scan_interval,
+    lore_constraints: settings.lore_constraints,
   };
 }
 
@@ -58,6 +82,7 @@ function extractPresetData(settings: LorevnterSettingsType): PresetData {
 function applyPresetData(settings: LorevnterSettingsType, data: PresetData): void {
   settings.lore_target_worldbooks = data.lore_target_worldbooks;
   settings.lore_scan_interval = data.lore_scan_interval;
+  settings.lore_constraints = data.lore_constraints;
 }
 
 /** 设置 Store */

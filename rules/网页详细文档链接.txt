@@ -1,0 +1,468 @@
+[Skip to content](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#VPContent)
+[酒馆助手](https://n0vi028.github.io/JS-Slash-Runner-Doc/)
+[主页](https://n0vi028.github.io/JS-Slash-Runner-Doc/)
+[指南](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%85%B3%E4%BA%8E%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B/%E4%BB%8B%E7%BB%8D.html)
+Appearance
+
+## 关于酒馆助手
+
+[介绍](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%85%B3%E4%BA%8E%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B/%E4%BB%8B%E7%BB%8D.html)
+介绍
+[安装与更新](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%85%B3%E4%BA%8E%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B/%E5%AE%89%E8%A3%85%E4%B8%8E%E6%9B%B4%E6%96%B0.html)
+安装与更新
+
+### 常见问题
+
+[安装与更新问题](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%85%B3%E4%BA%8E%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98/%E5%AE%89%E8%A3%85%E4%B8%8E%E6%9B%B4%E6%96%B0%E9%97%AE%E9%A2%98.html)
+安装与更新问题
+[游玩常见问题](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%85%B3%E4%BA%8E%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98/%E6%B8%B8%E7%8E%A9%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98.html)
+游玩常见问题
+[前端编写问题](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%85%B3%E4%BA%8E%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98/%E5%89%8D%E7%AB%AF%E7%BC%96%E5%86%99%E9%97%AE%E9%A2%98.html)
+前端编写问题
+[更新日志](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%85%B3%E4%BA%8E%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B/%E6%9B%B4%E6%96%B0%E6%97%A5%E5%BF%97.html)
+更新日志
+[参与贡献](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%85%B3%E4%BA%8E%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B/%E5%8F%82%E4%B8%8E%E8%B4%A1%E7%8C%AE.html)
+参与贡献
+
+## 基本用法
+
+[如何正确使用酒馆助手](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95/%E5%A6%82%E4%BD%95%E6%AD%A3%E7%A1%AE%E4%BD%BF%E7%94%A8%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B.html)
+如何正确使用酒馆助手
+[渲染器](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95/%E6%B8%B2%E6%9F%93%E5%99%A8.html)
+渲染器
+[脚本库](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95/%E8%84%9A%E6%9C%AC%E5%BA%93.html)
+脚本库
+[提示词查看器](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95/%E6%8F%90%E7%A4%BA%E8%AF%8D%E6%9F%A5%E7%9C%8B%E5%99%A8.html)
+提示词查看器
+[变量管理器](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95/%E5%8F%98%E9%87%8F%E7%AE%A1%E7%90%86%E5%99%A8.html)
+变量管理器
+[日志查看器](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95/%E6%97%A5%E5%BF%97%E6%9F%A5%E7%9C%8B%E5%99%A8.html)
+日志查看器
+[音频播放器](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95/%E9%9F%B3%E9%A2%91%E6%92%AD%E6%94%BE%E5%99%A8.html)
+音频播放器
+[酒馆体验优化](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95/%E9%85%92%E9%A6%86%E4%BD%93%E9%AA%8C%E4%BC%98%E5%8C%96.html)
+酒馆体验优化
+[开发其他插件时使用](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95/%E5%BC%80%E5%8F%91%E5%85%B6%E4%BB%96%E6%8F%92%E4%BB%B6%E6%97%B6%E4%BD%BF%E7%94%A8.html)
+开发其他插件时使用
+
+### 变量
+[变量类型](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%8F%98%E9%87%8F/%E5%8F%98%E9%87%8F%E7%B1%BB%E5%9E%8B.html)
+变量类型
+[获取变量](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%8F%98%E9%87%8F/%E8%8E%B7%E5%8F%96%E5%8F%98%E9%87%8F.html)
+获取变量
+[替换或修改变量](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%8F%98%E9%87%8F/%E6%9B%BF%E6%8D%A2%E6%88%96%E4%BF%AE%E6%94%B9%E5%8F%98%E9%87%8F.html)
+替换或修改变量
+[注册变量结构](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%8F%98%E9%87%8F/%E6%B3%A8%E5%86%8C%E5%8F%98%E9%87%8F%E7%BB%93%E6%9E%84.html)
+注册变量结构
+
+### 世界书
+[获取世界书](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E4%B8%96%E7%95%8C%E4%B9%A6/%E8%8E%B7%E5%8F%96%E4%B8%96%E7%95%8C%E4%B9%A6.html)
+获取世界书
+[修改世界书](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E4%B8%96%E7%95%8C%E4%B9%A6/%E4%BF%AE%E6%94%B9%E4%B8%96%E7%95%8C%E4%B9%A6.html)
+修改世界书
+[创建世界书](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E4%B8%96%E7%95%8C%E4%B9%A6/%E5%88%9B%E5%BB%BA%E4%B8%96%E7%95%8C%E4%B9%A6.html)
+创建世界书
+[删除世界书](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E4%B8%96%E7%95%8C%E4%B9%A6/%E5%88%A0%E9%99%A4%E4%B8%96%E7%95%8C%E4%B9%A6.html)
+删除世界书
+[导入或更新世界书](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E4%B8%96%E7%95%8C%E4%B9%A6/%E5%AF%BC%E5%85%A5%E6%88%96%E6%9B%B4%E6%96%B0%E4%B8%96%E7%95%8C%E4%B9%A6.html)
+导入或更新世界书
+
+### 楼层消息
+[获取消息](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E6%A5%BC%E5%B1%82%E6%B6%88%E6%81%AF/%E8%8E%B7%E5%8F%96%E6%B6%88%E6%81%AF.html)
+获取消息
+[修改消息](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E6%A5%BC%E5%B1%82%E6%B6%88%E6%81%AF/%E4%BF%AE%E6%94%B9%E6%B6%88%E6%81%AF.html)
+修改消息
+[创建消息](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E6%A5%BC%E5%B1%82%E6%B6%88%E6%81%AF/%E5%88%9B%E5%BB%BA%E6%B6%88%E6%81%AF.html)
+创建消息
+[删除消息](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E6%A5%BC%E5%B1%82%E6%B6%88%E6%81%AF/%E5%88%A0%E9%99%A4%E6%B6%88%E6%81%AF.html)
+删除消息
+[渲染消息](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E6%A5%BC%E5%B1%82%E6%B6%88%E6%81%AF/%E6%B8%B2%E6%9F%93%E6%B6%88%E6%81%AF.html)
+渲染消息
+
+### 角色卡
+[获取角色卡](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E8%A7%92%E8%89%B2%E5%8D%A1/%E8%8E%B7%E5%8F%96%E8%A7%92%E8%89%B2%E5%8D%A1.html)
+获取角色卡
+[修改角色卡](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E8%A7%92%E8%89%B2%E5%8D%A1/%E4%BF%AE%E6%94%B9%E8%A7%92%E8%89%B2%E5%8D%A1.html)
+修改角色卡
+[创建角色卡](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E8%A7%92%E8%89%B2%E5%8D%A1/%E5%88%9B%E5%BB%BA%E8%A7%92%E8%89%B2%E5%8D%A1.html)
+创建角色卡
+[删除角色卡](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E8%A7%92%E8%89%B2%E5%8D%A1/%E5%88%A0%E9%99%A4%E8%A7%92%E8%89%B2%E5%8D%A1.html)
+删除角色卡
+[导入或更新角色卡](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E8%A7%92%E8%89%B2%E5%8D%A1/%E5%AF%BC%E5%85%A5%E6%88%96%E6%9B%B4%E6%96%B0%E8%A7%92%E8%89%B2%E5%8D%A1.html)
+导入或更新角色卡
+[获取角色卡其他信息](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E8%A7%92%E8%89%B2%E5%8D%A1/%E8%8E%B7%E5%8F%96%E8%A7%92%E8%89%B2%E5%8D%A1%E5%85%B6%E4%BB%96%E4%BF%A1%E6%81%AF.html)
+获取角色卡其他信息
+
+### 预设
+[获取预设](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E9%A2%84%E8%AE%BE/%E8%8E%B7%E5%8F%96%E9%A2%84%E8%AE%BE.html)
+获取预设
+[修改预设](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E9%A2%84%E8%AE%BE/%E4%BF%AE%E6%94%B9%E9%A2%84%E8%AE%BE.html)
+修改预设
+[创建预设](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E9%A2%84%E8%AE%BE/%E5%88%9B%E5%BB%BA%E9%A2%84%E8%AE%BE.html)
+创建预设
+[删除预设](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E9%A2%84%E8%AE%BE/%E5%88%A0%E9%99%A4%E9%A2%84%E8%AE%BE.html)
+删除预设
+[导入或更新预设](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E9%A2%84%E8%AE%BE/%E5%AF%BC%E5%85%A5%E6%88%96%E6%9B%B4%E6%96%B0%E9%A2%84%E8%AE%BE.html)
+导入或更新预设
+
+### 播放音频
+[播放状态](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E6%92%AD%E6%94%BE%E9%9F%B3%E9%A2%91/%E6%92%AD%E6%94%BE%E7%8A%B6%E6%80%81.html)
+播放状态
+[播放列表](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E6%92%AD%E6%94%BE%E9%9F%B3%E9%A2%91/%E6%92%AD%E6%94%BE%E5%88%97%E8%A1%A8.html)
+播放列表
+[播放设置](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E6%92%AD%E6%94%BE%E9%9F%B3%E9%A2%91/%E6%92%AD%E6%94%BE%E8%AE%BE%E7%BD%AE.html)
+播放设置
+
+### 酒馆正则
+[获取正则](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E9%85%92%E9%A6%86%E6%AD%A3%E5%88%99/%E8%8E%B7%E5%8F%96%E6%AD%A3%E5%88%99.html)
+获取正则
+[创建和修改正则](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E9%85%92%E9%A6%86%E6%AD%A3%E5%88%99/%E5%88%9B%E5%BB%BA%E5%92%8C%E4%BF%AE%E6%94%B9%E6%AD%A3%E5%88%99.html)
+创建和修改正则
+
+### 酒馆助手脚本
+
+[获取脚本](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B%E8%84%9A%E6%9C%AC/%E8%8E%B7%E5%8F%96%E8%84%9A%E6%9C%AC.html)
+获取脚本
+[创建和修改脚本](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B%E8%84%9A%E6%9C%AC/%E5%88%9B%E5%BB%BA%E5%92%8C%E4%BF%AE%E6%94%B9%E8%84%9A%E6%9C%AC.html)
+创建和修改脚本
+[请求生成](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E8%AF%B7%E6%B1%82%E7%94%9F%E6%88%90.html)
+请求生成
+[监听和发送事件](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E7%9B%91%E5%90%AC%E5%92%8C%E5%8F%91%E9%80%81%E4%BA%8B%E4%BB%B6.html)
+监听和发送事件
+[导入或更新酒馆数据](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%AF%BC%E5%85%A5%E6%88%96%E6%9B%B4%E6%96%B0%E9%85%92%E9%A6%86%E6%95%B0%E6%8D%AE.html)
+导入或更新酒馆数据
+[注入提示词](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E6%B3%A8%E5%85%A5%E6%8F%90%E7%A4%BA%E8%AF%8D.html)
+注入提示词
+[触发快速回复命令](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E8%A7%A6%E5%8F%91%E5%BF%AB%E9%80%9F%E5%9B%9E%E5%A4%8D%E5%91%BD%E4%BB%A4.html)
+触发快速回复命令
+[酒馆助手宏](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B%E5%AE%8F.html)
+酒馆助手宏
+[安装酒馆扩展](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%AE%89%E8%A3%85%E9%85%92%E9%A6%86%E6%89%A9%E5%B1%95.html)
+安装酒馆扩展
+[查询版本](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E6%9F%A5%E8%AF%A2%E7%89%88%E6%9C%AC.html)
+查询版本
+[分享接口](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%88%86%E4%BA%AB%E6%8E%A5%E5%8F%A3.html)
+分享接口
+[其他工具函数](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html)
+其他工具函数
+[访问酒馆接口或其他插件](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E8%AE%BF%E9%97%AE%E9%85%92%E9%A6%86%E6%8E%A5%E5%8F%A3%E6%88%96%E5%85%B6%E4%BB%96%E6%8F%92%E4%BB%B6.html)
+访问酒馆接口或其他插件
+[内置第三方库](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%86%85%E7%BD%AE%E7%AC%AC%E4%B8%89%E6%96%B9%E5%BA%93.html)
+内置第三方库
+
+# 其他工具函数 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0)
+提示
+请务必先阅读[如何正确使用酒馆助手](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95/%E5%A6%82%E4%BD%95%E6%AD%A3%E7%A1%AE%E4%BD%BF%E7%94%A8%E9%85%92%E9%A6%86%E5%8A%A9%E6%89%8B.html)
+[点击查看对应类型定义文件 (可发给 AI 或 IDE 使用, 酒馆助手界面中提供了打包下载)](https://github.com/N0VI028/JS-Slash-Runner/blob/main/%40types/iframe/util.d.ts)
+
+## reloadIframe [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#reloadiframe)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#reloadiframe)
+在前端界面或脚本内使用, 从而重新加载前端界面或脚本.
+这相当于调用 window.location.reload(), 会让分享到全局的接口失效; 如果有需要在重新加载前端界面后沿用的数据, 你应该自行编写重新加载方式而不是使用这个函数.
+
+```
+window.location.reload()
+```
+
+
+```
+function reloadIframe(): void;
+```
+
+
+```
+function reloadIframe(): void;
+```
+
+### 示例 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E7%A4%BA%E4%BE%8B)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E7%A4%BA%E4%BE%8B)
+
+```
+// 当聊天文件变更时, 重新加载前端界面或脚本 let current_chat_id = SillyTavern.getCurrentChatId(); eventOn(tavern_events.CHAT_CHANGED, chat_id => { if (current_chat_id !== chat_id) { current_chat_id = chat_id; reloadIframe(); } })
+```
+
+
+```
+// 当聊天文件变更时, 重新加载前端界面或脚本 let current_chat_id = SillyTavern.getCurrentChatId(); eventOn(tavern_events.CHAT_CHANGED, chat_id => { if (current_chat_id !== chat_id) { current_chat_id = chat_id; reloadIframe(); } })
+```
+
+## substitudeMacros [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#substitudemacros)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#substitudemacros)
+替换字符串中的 SillyTavern 宏
+
+```
+function substitudeMacros(text: string): string;
+```
+
+
+```
+function substitudeMacros(text: string): string;
+```
+
+### 参数 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%8F%82%E6%95%B0)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%8F%82%E6%95%B0)
+
+#### text [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#text)
+
+```
+text
+```
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#text)
+- 类型: string
+- 描述: 需要替换的字符串
+
+```
+string
+```
+
+### 返回值 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC)
+- 替换结果: string
+
+```
+string
+```
+
+### 示例 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E7%A4%BA%E4%BE%8B-1)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E7%A4%BA%E4%BE%8B-1)
+
+```
+const text = substitudeMacros("{{char}} speaks in {{lastMessageId}}"); text === "少女歌剧 speaks in 5";
+```
+
+
+```
+const text = substitudeMacros("{{char}} speaks in {{lastMessageId}}"); text === "少女歌剧 speaks in 5";
+```
+
+## getLastMessageId [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#getlastmessageid)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#getlastmessageid)
+获取最新楼层号
+
+```
+function getLastMessageId(): number;
+```
+
+
+```
+function getLastMessageId(): number;
+```
+
+### 返回值 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-1)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-1)
+- 最新楼层号: number
+
+```
+number
+```
+
+## errorCatched [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#errorcatched)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#errorcatched)
+包装任意函数, 返回一个会将报错消息通过酒馆通知显示出来的同功能函数.
+
+```
+function errorCatched<T extends any[], U>(fn: (...args: T) => U): (...args: T) => U;
+```
+
+
+```
+function errorCatched<T extends any[], U>(fn: (...args: T) => U): (...args: T) => U;
+```
+
+### 参数 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%8F%82%E6%95%B0-1)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%8F%82%E6%95%B0-1)
+
+#### fn [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#fn)
+
+```
+fn
+```
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#fn)
+- 类型: (...args: T) => U
+- 描述: 要包装的函数
+
+```
+(...args: T) => U
+```
+
+### 返回值 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-2)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-2)
+- 包装后的函数: (...args: T) => U
+- 描述: 包装后的函数会捕获 fn 函数的报错, 并通过酒馆通知显示出来
+
+```
+(...args: T) => U
+```
+
+
+```
+fn
+```
+
+### 示例 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E7%A4%BA%E4%BE%8B-2)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E7%A4%BA%E4%BE%8B-2)
+
+```
+function test() { throw Error(`test`); } const error_catched_test = errorCatched(test); error_catched_test(); // 酒馆通知: test
+```
+
+
+```
+function test() { throw Error(`test`); } const error_catched_test = errorCatched(test); error_catched_test(); // 酒馆通知: test
+```
+
+## getIframeName 🚫TavernHelper [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#getiframename)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#getiframename)
+获取前端界面或脚本的 iframe 标识名称
+
+```
+function getIframeName(): string;
+```
+
+
+```
+function getIframeName(): string;
+```
+
+### 返回值 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-3)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-3)
+- iframe 标识名称: string对于楼层消息是 TH-message--楼层号--前端界面是该楼层第几个界面对于脚本库是 TH-script--脚本名称--脚本id
+- 对于楼层消息是 TH-message--楼层号--前端界面是该楼层第几个界面
+- 对于脚本库是 TH-script--脚本名称--脚本id
+
+```
+string
+```
+
+- 对于楼层消息是 TH-message--楼层号--前端界面是该楼层第几个界面
+- 对于脚本库是 TH-script--脚本名称--脚本id
+
+```
+TH-message--楼层号--前端界面是该楼层第几个界面
+```
+
+
+```
+TH-script--脚本名称--脚本id
+```
+
+## getMessageId 🚫TavernHelper [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#getmessageid)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#getmessageid)
+从前端界面的 iframe 标识名称 iframe_name 获取它所在楼层的楼层号, 只能对前端界面 iframe 标识名称使用
+
+```
+iframe_name
+```
+
+
+```
+function getMessageId(iframe_name: string): number;
+```
+
+
+```
+function getMessageId(iframe_name: string): number;
+```
+
+### 参数 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%8F%82%E6%95%B0-2)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%8F%82%E6%95%B0-2)
+
+#### iframe_name [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#iframe-name)
+
+```
+iframe_name
+```
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#iframe-name)
+- 类型: string
+- 描述: 前端界面的 iframe 标识名称
+
+```
+string
+```
+
+### 返回值 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-4)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-4)
+- 楼层号: number
+
+```
+number
+```
+
+### 异常 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%BC%82%E5%B8%B8)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%BC%82%E5%B8%B8)
+- 如果提供的 iframe_name 不是前端界面 iframe 标识名称, 将会抛出错误
+
+```
+iframe_name
+```
+
+## getCurrentMessageId 🚫TavernHelper [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#getcurrentmessageid)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#getcurrentmessageid)
+获取本前端界面所在楼层的楼层号, 只能在前端界面内使用
+
+```
+function getCurrentMessageId(): number;
+```
+
+
+```
+function getCurrentMessageId(): number;
+```
+
+### 返回值 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-5)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-5)
+- 楼层号: number
+
+```
+number
+```
+
+### 异常 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%BC%82%E5%B8%B8-1)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%BC%82%E5%B8%B8-1)
+- 如果不在前端界面内使用, 将会抛出错误
+
+## getScriptId 🚫TavernHelper [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#getscriptid)
+
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#getscriptid)
+获取脚本库的脚本 id
+
+```
+function getScriptId(): string;
+```
+
+
+```
+function getScriptId(): string;
+```
+
+### 返回值 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-6)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E8%BF%94%E5%9B%9E%E5%80%BC-6)
+- 脚本 id: string
+
+```
+string
+```
+
+### 异常 [​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%BC%82%E5%B8%B8-2)
+[​](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%85%B6%E4%BB%96%E5%B7%A5%E5%85%B7%E5%87%BD%E6%95%B0.html#%E5%BC%82%E5%B8%B8-2)
+- 如果不在脚本内使用, 将会抛出错误
+Last updated:
+[Previous page分享接口](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E5%88%86%E4%BA%AB%E6%8E%A5%E5%8F%A3.html)
+[Next page访问酒馆接口或其他插件](https://n0vi028.github.io/JS-Slash-Runner-Doc/guide/%E5%8A%9F%E8%83%BD%E8%AF%A6%E6%83%85/%E8%AE%BF%E9%97%AE%E9%85%92%E9%A6%86%E6%8E%A5%E5%8F%A3%E6%88%96%E5%85%B6%E4%BB%96%E6%8F%92%E4%BB%B6.html)
+作者：KAKAA, 青空莉想做舞台少女的狗
+© Copyright 2026, N0VI028.Licensed under [Aladdin](https://github.com/N0VI028/JS-Slash-Runner/blob/main/LICENSE), Icons by [Icons8](https://igoutu.cn/)

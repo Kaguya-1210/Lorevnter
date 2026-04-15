@@ -6,7 +6,9 @@
 import { createLogger, setDebugMode } from './logger';
 import { useRuntimeStore } from './state';
 import { useSettingsStore } from './settings';
+import { useContextStore } from './core/worldbook-context';
 import { createScriptIdDiv, teleportStyle } from '@util/script';
+import { shouldAutoScan, runUpdatePipeline, resetMessageCount } from './core/update-pipeline';
 import LorevnterWindow from './window/LorevnterWindow.vue';
 
 // 导入样式
@@ -90,6 +92,46 @@ $(() => {
   logger.info('脚本已加载');
 
   mountApp();
+
+  // ── 初始化上下文 + 事件监听 ──
+  const ctx = useContextStore();
+  try {
+    ctx.refresh();
+    toastr.info(`${ctx.context.sourceLabel}`, 'Lorevnter');
+  } catch (e) {
+    logger.error('初始化上下文失败: ' + (e as Error).message);
+    toastr.error('获取世界书状态失败', 'Lorevnter');
+  }
+
+  // 监听聊天切换
+  eventOn(tavern_events.CHAT_CHANGED, (chatFileName) => {
+    logger.info(`聊天已切换: ${chatFileName}`);
+    try {
+      ctx.refresh();
+      const mode = ctx.context.mode;
+      if (mode === 'idle') {
+        toastr.warning('请打开角色卡或设置全局世界书', 'Lorevnter');
+      } else {
+        toastr.info(`已切换到: ${ctx.context.sourceLabel}`, 'Lorevnter');
+      }
+    } catch (e) {
+      logger.error('聊天切换后刷新上下文失败: ' + (e as Error).message);
+      toastr.error('获取世界书状态失败', 'Lorevnter');
+    }
+  });
+
+  // 监听聊天切换时重置消息计数
+  eventOn(tavern_events.CHAT_CHANGED, () => {
+    resetMessageCount();
+  });
+
+  // 监听新消息（自动触发 AI 分析）
+  eventOn(tavern_events.MESSAGE_RECEIVED, async () => {
+    if (shouldAutoScan()) {
+      logger.info('自动触发 AI 分析');
+      await runUpdatePipeline();
+    }
+  });
 
   // 创建脚本按钮
   try {

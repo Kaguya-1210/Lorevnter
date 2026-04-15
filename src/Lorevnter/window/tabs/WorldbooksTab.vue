@@ -3,6 +3,7 @@
     <!-- 工具栏 -->
     <div class="wb-toolbar">
       <button class="wb-btn wb-btn-accent" @click="refreshAll">🔄 刷新世界书列表</button>
+      <button class="wb-btn wb-btn-ai" @click="onAiAnalyze">🔍 AI 分析</button>
     </div>
 
     <!-- 激活状态 -->
@@ -55,6 +56,7 @@
 <script setup lang="ts">
 import { useRuntimeStore } from '../../state';
 import * as WorldbookAPI from '../../core/worldbook-api';
+import { runUpdatePipeline } from '../../core/update-pipeline';
 import { createLogger } from '../../logger';
 
 const logger = createLogger('worldbooks-tab');
@@ -67,9 +69,15 @@ const loading = ref(false);
 const activeInfo = ref<ReturnType<typeof WorldbookAPI.getActive> | null>(null);
 
 function refreshAll() {
-  allNames.value = WorldbookAPI.listAll();
-  activeInfo.value = WorldbookAPI.getActive();
-  logger.info(`已刷新世界书列表: ${allNames.value.length} 个`);
+  try {
+    allNames.value = WorldbookAPI.listAll();
+    activeInfo.value = WorldbookAPI.getActive();
+    logger.info(`已刷新世界书列表: ${allNames.value.length} 个`);
+    toastr.success(`已刷新: ${allNames.value.length} 个世界书`, 'Lorevnter');
+  } catch (e) {
+    logger.error(`刷新世界书列表失败: ${(e as Error).message}`);
+    toastr.error('刷新世界书列表失败', 'Lorevnter');
+  }
 }
 
 async function selectWorldbook(name: string) {
@@ -77,11 +85,23 @@ async function selectWorldbook(name: string) {
   loading.value = true;
   try {
     entries.value = await WorldbookAPI.fetch(name);
+    toastr.success(`已加载: ${name} (${entries.value.length} 条)`, 'Lorevnter');
   } catch (e) {
     logger.error(`加载世界书失败: ${(e as Error).message}`);
+    toastr.error(`加载失败: ${name}`, 'Lorevnter');
     entries.value = [];
   } finally {
     loading.value = false;
+  }
+}
+
+async function onAiAnalyze() {
+  await runUpdatePipeline();
+  // 刷新当前选中的世界书条目（可能已被 AI 更新）
+  if (selectedName.value) {
+    try {
+      entries.value = await WorldbookAPI.fetch(selectedName.value);
+    } catch { /* 静默 */ }
   }
 }
 
@@ -102,6 +122,8 @@ onMounted(() => {
 .wb-btn:hover { background: var(--lore-bg-tertiary); color: var(--lore-text-primary); }
 .wb-btn-accent { border-color: var(--lore-accent); color: var(--lore-accent); }
 .wb-btn-accent:hover { background: var(--lore-accent-bg); }
+.wb-btn-ai { border-color: #50c878; color: #50c878; }
+.wb-btn-ai:hover { background: rgba(80, 200, 120, 0.1); }
 
 .wb-section-title {
   font-size: 11px; font-weight: 600; color: var(--lore-text-secondary);
