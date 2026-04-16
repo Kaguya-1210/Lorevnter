@@ -191,7 +191,8 @@
   </div>
 </template>
 
-<script setup lang="ts">import { useSettingsStore } from '../../settings';
+<script setup lang="ts">
+import { useSettingsStore } from '../../settings';
 import { testApiConnection, fetchModelList, getTavernCurrentModel } from '../../core/ai-engine';
 import { openPromptEditor } from '../../core/prompt-editor';
 

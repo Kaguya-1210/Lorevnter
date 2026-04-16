@@ -63,14 +63,6 @@
           <button class="st-btn" :disabled="!selectedWb" @click="addWorldbook">+ 添加</button>
         </div>
       </div>
-
-      <div class="st-row">
-        <div class="st-row-main">
-          <span class="st-label">触发楼层</span>
-          <input type="number" v-model.number="settings.lore_scan_interval" class="st-number" min="1" max="99" />
-        </div>
-        <span class="st-hint">自动模式下每隔 N 次 AI 回复触发一次分析（仅计 AI 回复，不计用户消息）</span>
-      </div>
     </div>
 
     <!-- 关于 -->
