@@ -117,6 +117,18 @@ const LorevnterSettings = z
     lore_presets: z.array(PresetSchema).default([]),
     /** 提示词预设（独立于全局预设） */
     lore_prompt_presets: z.array(PromptPresetSchema).default([]),
+
+    // ── 持久化计数（per-chat AI 回复计数） ──
+    /** key=chatFileName, value=aiReplyCount */
+    lore_ai_reply_counts: z.record(z.string(), z.number()).default({}),
+
+    // ── 备份配置 ──
+    /** 是否启用自动备份 */
+    lore_backup_enabled: z.boolean().default(true),
+    /** 备份间隔（每 N 次管线执行） */
+    lore_backup_interval: z.number().default(1),
+    /** 最大备份保留数 */
+    lore_backup_max_count: z.number().default(5),
   })
   .prefault({});
 

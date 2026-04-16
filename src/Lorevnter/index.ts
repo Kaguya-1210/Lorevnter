@@ -8,7 +8,7 @@ import { useRuntimeStore, type TabName } from './state';
 import { useSettingsStore } from './settings';
 import { useContextStore } from './core/worldbook-context';
 import { createScriptIdDiv, teleportStyle } from '@util/script';
-import { incrementAndCheckAutoScan, runUpdatePipeline, resetMessageCount } from './core/update-pipeline';
+import { incrementAndCheckAutoScan, runUpdatePipeline, resetMessageCount, setCurrentChatId } from './core/update-pipeline';
 import LorevnterWindow from './window/LorevnterWindow.vue';
 
 // 导入样式
@@ -106,6 +106,8 @@ $(() => {
   // 监听聊天切换
   eventOn(tavern_events.CHAT_CHANGED, (chatFileName) => {
     logger.info(`聊天已切换: ${chatFileName}`);
+    // 设置当前聊天 ID 用于 per-chat 计数
+    setCurrentChatId(String(chatFileName || ''));
     try {
       ctx.refresh();
       const mode = ctx.context.mode;
@@ -118,11 +120,6 @@ $(() => {
       logger.error('聊天切换后刷新上下文失败: ' + (e as Error).message);
       toastr.error('获取世界书状态失败', 'Lorevnter');
     }
-  });
-
-  // 监听聊天切换时重置消息计数
-  eventOn(tavern_events.CHAT_CHANGED, () => {
-    resetMessageCount();
   });
 
   // 监听新消息（仅 AI 回复时计数，满足间隔则自动触发分析）

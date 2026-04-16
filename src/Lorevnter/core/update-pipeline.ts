@@ -10,31 +10,48 @@ import { useRuntimeStore } from '../state';
 import { getEntryConstraint } from './constraints';
 import * as WorldbookAPI from './worldbook-api';
 import { analyzeOnePass, analyzeTwoPass, getApiSnapshot, type AnalysisEntry, type AnalysisRequest } from './ai-engine';
+import { autoBackupIfNeeded } from './backup-manager';
 
 const logger = createLogger('pipeline');
 
-/** 消息计数（用于自动触发间隔判断，仅计数 AI 回复） */
-let aiMessageCount = 0;
+/** 当前聊天文件名（由 index.ts 在 CHAT_CHANGED 时设置） */
+let currentChatId = '';
 
 /** 是否正在执行管线 */
 let running = false;
 
+/** 设置当前聊天 ID（由 index.ts 调用） */
+export function setCurrentChatId(chatId: string): void {
+  currentChatId = chatId;
+}
+
+/** 获取当前聊天的 AI 回复计数 */
+export function getAiReplyCount(): number {
+  if (!currentChatId) return 0;
+  const { settings } = useSettingsStore();
+  return settings.lore_ai_reply_counts[currentChatId] ?? 0;
+}
+
 /**
- * AI 回复时调用：增加计数并判断是否应触发自动扫描。
+ * AI 回复时调用：增加持久化计数并判断是否应触发自动扫描。
  * 仅在 auto 模式下且满足间隔条件时返回 true。
  */
 export function incrementAndCheckAutoScan(): boolean {
   const { settings } = useSettingsStore();
   if (settings.lore_scan_trigger !== 'auto') return false;
   if (running) return false;
+  if (!currentChatId) return false;
 
-  aiMessageCount++;
-  return aiMessageCount % settings.lore_scan_interval === 0;
+  const count = (settings.lore_ai_reply_counts[currentChatId] ?? 0) + 1;
+  settings.lore_ai_reply_counts[currentChatId] = count;
+
+  return count % settings.lore_scan_interval === 0;
 }
 
-/** 重置消息计数 */
+/** 重置指定聊天的消息计数（不再使用，改为 per-chat 自动管理） */
 export function resetMessageCount(): void {
-  aiMessageCount = 0;
+  // 保留接口兼容，不再需要手动 reset
+  // 切换聊天时 setCurrentChatId 自动切换到对应计数
 }
 
 /**
@@ -66,6 +83,9 @@ export async function runUpdatePipeline(): Promise<void> {
       return;
     }
     logger.info(`活跃世界书: ${worldbookNames.join(', ')}`);
+
+    // Step 1.5: 自动备份（AI 分析前快照）
+    await autoBackupIfNeeded(worldbookNames);
 
     // Step 2: 加载所有条目
     const allEntries: WorldbookEntry[] = [];

@@ -41,6 +41,44 @@
       </div>
     </div>
 
+    <!-- 分组 0.5: 快速信息 -->
+    <div class="debug-section">
+      <div class="debug-section-header" @click="showQuickInfo = !showQuickInfo">
+        <span class="debug-section-icon">{{ showQuickInfo ? '▼' : '▶' }}</span>
+        <span class="debug-section-title">⚡ 快速信息</span>
+      </div>
+      <div v-if="showQuickInfo" class="debug-section-body">
+        <!-- 当前楼层计数 -->
+        <div class="debug-kv-item">
+          <span class="debug-key">当前聊天 AI 回复计数</span>
+          <span class="debug-value">{{ currentAiReplyCount }}</span>
+        </div>
+        <div class="debug-kv-item">
+          <span class="debug-key">自动触发间隔</span>
+          <span class="debug-value">每 {{ settings.lore_scan_interval }} 次 AI 回复</span>
+        </div>
+        <div class="debug-kv-item">
+          <span class="debug-key">触发模式</span>
+          <span class="debug-value">{{ settings.lore_scan_trigger === 'auto' ? '自动' : '手动' }}</span>
+        </div>
+
+        <!-- 一键获取 API 配置 -->
+        <div style="margin-top: 8px;">
+          <button class="debug-action-btn-full" @click="onFetchApiSnapshot">📋 一键获取当前 API 配置</button>
+        </div>
+        <div v-if="apiSnapshot" class="debug-ai-api-details" style="margin-top: 6px;">
+          <div class="debug-kv-item"><span class="debug-key">来源</span><span class="debug-value">{{ apiSnapshot.source === 'tavern' ? '酒馆代理' : '自定义' }}</span></div>
+          <div class="debug-kv-item"><span class="debug-key">API 地址</span><span class="debug-value debug-mono">{{ apiSnapshot.apiUrl }}</span></div>
+          <div class="debug-kv-item"><span class="debug-key">模型</span><span class="debug-value debug-mono">{{ apiSnapshot.model }}</span></div>
+          <div class="debug-kv-item"><span class="debug-key">温度</span><span class="debug-value">{{ apiSnapshot.temperature }}</span></div>
+          <div class="debug-kv-item"><span class="debug-key">Top P</span><span class="debug-value">{{ apiSnapshot.topP }}</span></div>
+          <div class="debug-kv-item"><span class="debug-key">最大 Tokens</span><span class="debug-value">{{ apiSnapshot.maxTokens }}</span></div>
+          <div class="debug-kv-item"><span class="debug-key">频率惩罚</span><span class="debug-value">{{ apiSnapshot.frequencyPenalty }}</span></div>
+          <div class="debug-kv-item"><span class="debug-key">存在惩罚</span><span class="debug-value">{{ apiSnapshot.presencePenalty }}</span></div>
+        </div>
+      </div>
+    </div>
+
     <!-- 分组 1: 上下文快照 -->
     <div class="debug-section">
       <div class="debug-section-header" @click="showContext = !showContext">
@@ -228,8 +266,8 @@ import { useRuntimeStore } from '../../state';
 import { useSettingsStore } from '../../settings';
 import { useContextStore } from '../../core/worldbook-context';
 import { clearLogBuffer } from '../../logger';
-import { buildAnalysisRequest } from '../../core/update-pipeline';
-import { buildOnePassPrompts, buildTwoPassPrompts, testApiConnection } from '../../core/ai-engine';
+import { buildAnalysisRequest, getAiReplyCount } from '../../core/update-pipeline';
+import { buildOnePassPrompts, buildTwoPassPrompts, testApiConnection, getApiSnapshot } from '../../core/ai-engine';
 import { useSelfCheckStore } from '../../stores/selfCheckStore';
 import * as WorldbookAPI from '../../core/worldbook-api';
 
@@ -240,10 +278,20 @@ const selfCheckStore = useSelfCheckStore();
 
 // ── 折叠状态 ──
 const showSelfCheck = ref(false);
+const showQuickInfo = ref(false);
 const showContext = ref(false);
 const showAiHistory = ref(false);
 const showPromptPreview = ref(false);
 const showLogs = ref(false);
+
+// ── 快速信息 ──
+const apiSnapshot = ref<ReturnType<typeof getApiSnapshot> | null>(null);
+const currentAiReplyCount = computed(() => getAiReplyCount());
+
+function onFetchApiSnapshot() {
+  apiSnapshot.value = getApiSnapshot();
+  toastr.success('API 配置已获取', 'Lorevnter');
+}
 
 // ── 日志过滤 ──
 const logFilter = ref('all');
@@ -537,4 +585,17 @@ function startDiagnostics() {
 .sc-st-error .sc-compact-result { color: var(--lore-danger); }
 .sc-st-success .sc-compact-result { color: var(--lore-success); }
 .sc-compact-done { font-size: 12px; color: var(--lore-success); font-weight: 600; text-align: center; padding: 8px 0; }
+
+/* 全宽操作按钮 */
+.debug-action-btn-full {
+  width: 100%; padding: 10px 14px; border: 1px solid var(--lore-accent);
+  border-radius: var(--lore-radius-sm); background: var(--lore-accent-bg);
+  color: var(--lore-accent); font-size: 13px; font-weight: 500;
+  cursor: pointer; min-height: 44px;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.debug-action-btn-full:hover {
+  background: var(--lore-accent); color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
 </style>
