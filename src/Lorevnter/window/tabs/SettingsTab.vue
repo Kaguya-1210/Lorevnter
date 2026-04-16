@@ -87,10 +87,12 @@
 
 <script setup lang="ts">
 import { useSettingsStore } from '../../settings';
+import { useRuntimeStore } from '../../state';
 import * as WorldbookAPI from '../../core/worldbook-api';
 import { useContextStore } from '../../core/worldbook-context';
 
 const { settings } = useSettingsStore();
+const runtime = useRuntimeStore();
 const contextStore = useContextStore();
 
 const selectedWb = ref('');
@@ -112,6 +114,15 @@ function addWorldbook() {
 function removeWorldbook(index: number) {
   settings.lore_target_worldbooks.splice(index, 1);
 }
+
+// 开启调试模式 → 自动切到调试页；关闭 → 若在调试页则切回设置
+watch(() => settings.lore_debug_mode, (on) => {
+  if (on) {
+    runtime.currentTab = 'logs';
+  } else if (runtime.currentTab === 'logs') {
+    runtime.currentTab = 'settings';
+  }
+});
 
 onMounted(() => {
   allWorldbooks.value = WorldbookAPI.listAll();
