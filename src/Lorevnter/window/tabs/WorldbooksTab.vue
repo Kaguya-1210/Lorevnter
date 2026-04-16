@@ -15,10 +15,10 @@
     <div v-if="activeInfo" class="wb-active-section">
       <div class="wb-section-title">当前激活</div>
       <div class="wb-active-tags">
-        <span v-for="name in activeInfo.global" :key="'g-'+name" class="wb-tag wb-tag-global" @click="selectedName = name; loadEntries(name)">🌐 {{ name }}</span>
-        <span v-if="activeInfo.character.primary" class="wb-tag wb-tag-char" @click="selectedName = activeInfo.character.primary!; loadEntries(activeInfo.character.primary!)">👤 {{ activeInfo.character.primary }}</span>
-        <span v-for="name in activeInfo.character.additional" :key="'ca-'+name" class="wb-tag wb-tag-char" @click="selectedName = name; loadEntries(name)">👤 {{ name }}</span>
-        <span v-if="activeInfo.chat" class="wb-tag wb-tag-chat" @click="selectedName = activeInfo.chat!; loadEntries(activeInfo.chat!)">💬 {{ activeInfo.chat }}</span>
+        <span v-for="name in activeInfo.global" :key="'g-'+name" class="wb-tag wb-tag-global" @click="onSelectTag(name)">🌐 {{ name }}</span>
+        <span v-if="activeInfo.character.primary" class="wb-tag wb-tag-char" @click="onSelectTag(activeInfo.character.primary!)">👤 {{ activeInfo.character.primary }}</span>
+        <span v-for="name in activeInfo.character.additional" :key="'ca-'+name" class="wb-tag wb-tag-char" @click="onSelectTag(name)">👤 {{ name }}</span>
+        <span v-if="activeInfo.chat" class="wb-tag wb-tag-chat" @click="onSelectTag(activeInfo.chat!)">💬 {{ activeInfo.chat }}</span>
         <span v-if="!activeInfo.global.length && !activeInfo.character.primary && !activeInfo.character.additional.length && !activeInfo.chat" class="wb-empty">无激活的世界书</span>
       </div>
     </div>
@@ -63,28 +63,32 @@ const logger = createLogger('worldbooks-tab');
 const runtime = useRuntimeStore();
 
 const allNames = ref<string[]>([]);
-const selectedName = ref<string | null>(null);
+const selectedName = computed({
+  get: () => runtime.worldbookSelectedName,
+  set: (v) => { runtime.worldbookSelectedName = v; },
+});
 const entries = ref<WorldbookEntry[]>([]);
 const loading = ref(false);
 const activeInfo = ref<ReturnType<typeof WorldbookAPI.getActive> | null>(null);
 
-function refreshAll() {
+function refreshAll(silent = false) {
   try {
     allNames.value = WorldbookAPI.listAll();
     activeInfo.value = WorldbookAPI.getActive();
     logger.info(`已刷新世界书列表: ${allNames.value.length} 个`);
-    toastr.success(`已刷新: ${allNames.value.length} 个世界书`, 'Lorevnter');
+    if (!silent) toastr.success(`已刷新: ${allNames.value.length} 个世界书`, 'Lorevnter');
   } catch (e) {
     logger.error(`刷新世界书列表失败: ${(e as Error).message}`);
     toastr.error('刷新世界书列表失败', 'Lorevnter');
   }
 }
 
-async function loadEntries(name: string) {
+async function loadEntries(name: string, silent = false) {
+  if (loading.value) return; // 防止重复加载
   loading.value = true;
   try {
     entries.value = await WorldbookAPI.fetch(name);
-    toastr.success(`已加载: ${name} (${entries.value.length} 条)`, 'Lorevnter');
+    if (!silent) toastr.success(`已加载: ${name} (${entries.value.length} 条)`, 'Lorevnter');
   } catch (e) {
     logger.error(`加载世界书失败: ${(e as Error).message}`);
     toastr.error(`加载失败: ${name}`, 'Lorevnter');
@@ -92,6 +96,13 @@ async function loadEntries(name: string) {
   } finally {
     loading.value = false;
   }
+}
+
+/** 激活标签点击：同名不重复加载 */
+function onSelectTag(name: string) {
+  if (selectedName.value === name && entries.value.length > 0) return;
+  selectedName.value = name;
+  loadEntries(name);
 }
 
 function onSelectChange() {
@@ -104,7 +115,6 @@ function onSelectChange() {
 
 async function onAiAnalyze() {
   await runUpdatePipeline();
-  // 刷新当前选中的世界书条目（可能已被 AI 更新）
   if (selectedName.value) {
     try {
       entries.value = await WorldbookAPI.fetch(selectedName.value);
@@ -144,8 +154,11 @@ function getStrategyTitle(entry: WorldbookEntry): string {
   }
 }
 
-onMounted(() => {
-  refreshAll();
+onMounted(async () => {
+  refreshAll(true); // 挂载时静默刷新
+  if (selectedName.value) {
+    await loadEntries(selectedName.value, true); // 恢复时静默加载
+  }
 });
 </script>
 

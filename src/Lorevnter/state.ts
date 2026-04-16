@@ -10,6 +10,10 @@ export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
   const windowVisible = ref(false);
   const currentTab = ref<'worldbooks' | 'constraints' | 'presets' | 'settings' | 'logs'>('worldbooks');
 
+  // ── 世界书浏览状态 ──
+  /** 当前选中的世界书名（Tab 切换不丢失） */
+  const worldbookSelectedName = ref<string | null>(null);
+
   // ── 世界书数据缓存 ──
   /** key = 世界书名称, value = 条目列表 */
   const worldBookCache = ref<Record<string, WorldbookEntry[]>>({});
@@ -43,6 +47,7 @@ export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
   return {
     windowVisible,
     currentTab,
+    worldbookSelectedName,
     worldBookCache,
     logEntries,
     aiCallHistory,

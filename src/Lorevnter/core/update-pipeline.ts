@@ -13,30 +13,28 @@ import { analyzeOnePass, analyzeTwoPass, type AnalysisEntry, type AnalysisReques
 
 const logger = createLogger('pipeline');
 
-/** 消息计数（用于自动触发间隔判断） */
-let messageCount = 0;
+/** 消息计数（用于自动触发间隔判断，仅计数 AI 回复） */
+let aiMessageCount = 0;
 
 /** 是否正在执行管线 */
 let running = false;
 
 /**
- * 判断是否应该触发自动扫描
+ * AI 回复时调用：增加计数并判断是否应触发自动扫描。
+ * 仅在 auto 模式下且满足间隔条件时返回 true。
  */
-export function shouldAutoScan(): boolean {
+export function incrementAndCheckAutoScan(): boolean {
   const { settings } = useSettingsStore();
   if (settings.lore_scan_trigger !== 'auto') return false;
   if (running) return false;
 
-  messageCount++;
-  if (messageCount % settings.lore_scan_interval === 0) {
-    return true;
-  }
-  return false;
+  aiMessageCount++;
+  return aiMessageCount % settings.lore_scan_interval === 0;
 }
 
 /** 重置消息计数 */
 export function resetMessageCount(): void {
-  messageCount = 0;
+  aiMessageCount = 0;
 }
 
 /**
@@ -215,4 +213,46 @@ function recordAiCall(
   } catch {
     // 静默，不影响主流程
   }
+}
+
+/**
+ * 构建分析请求（不执行分析）。
+ * 供调试页提示词预览使用。
+ * 返回 null 表示条件不满足（无世界书/无条目/无消息）。
+ */
+export async function buildAnalysisRequest(): Promise<AnalysisRequest | null> {
+  const ctx = useContextStore();
+  const { settings } = useSettingsStore();
+
+  if (ctx.context.mode === 'idle') return null;
+
+  const worldbookNames = ctx.getActiveWorldbookNames();
+  if (worldbookNames.length === 0) return null;
+
+  const allEntries: WorldbookEntry[] = [];
+  const worldbookMap: Record<string, WorldbookEntry[]> = {};
+  const analysisEntries: AnalysisEntry[] = [];
+
+  for (const wbName of worldbookNames) {
+    try {
+      const entries = await WorldbookAPI.fetch(wbName);
+      worldbookMap[wbName] = entries;
+      allEntries.push(...entries);
+
+      for (const entry of entries) {
+        const constraint = getEntryConstraint(entry);
+        if (constraint?.type === 'skip') continue;
+        analysisEntries.push({ entry, constraint });
+      }
+    } catch {
+      // 静默
+    }
+  }
+
+  if (analysisEntries.length === 0) return null;
+
+  const chatMessages = getRecentChatMessages(settings.lore_ai_max_context);
+  if (chatMessages.length === 0) return null;
+
+  return { chatMessages, entries: analysisEntries, allEntries, worldbookMap };
 }

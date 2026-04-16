@@ -68,6 +68,18 @@ const LorevnterSettings = z
     /** 触发模式 */
     lore_scan_trigger: z.enum(['auto', 'manual']).default('manual'),
 
+    // ── AI 采样参数 ──
+    /** 温度（创造性）。same_as_preset = 跟随酒馆预设 */
+    lore_ai_temperature: z.union([z.literal('same_as_preset'), z.number()]).default('same_as_preset'),
+    /** Top P（核采样） */
+    lore_ai_top_p: z.union([z.literal('same_as_preset'), z.number()]).default('same_as_preset'),
+    /** 最大回复 tokens */
+    lore_ai_max_tokens: z.union([z.literal('same_as_preset'), z.number()]).default('same_as_preset'),
+    /** 频率惩罚 */
+    lore_ai_frequency_penalty: z.union([z.literal('same_as_preset'), z.number()]).default('same_as_preset'),
+    /** 存在惩罚 */
+    lore_ai_presence_penalty: z.union([z.literal('same_as_preset'), z.number()]).default('same_as_preset'),
+
     // ── AI API 连接配置（不纳入预设） ──
     /** API 格式（当前仅 OpenAI 兼容） */
     lore_api_format: z.enum(['openai']).default('openai'),

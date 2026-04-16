@@ -87,7 +87,48 @@
       </div>
     </div>
 
-    <!-- 分组 3: 操作日志 -->
+    <!-- 分组 3: 提示词预览 -->
+    <div class="debug-section">
+      <div class="debug-section-header" @click="showPromptPreview = !showPromptPreview">
+        <span class="debug-section-icon">{{ showPromptPreview ? '▼' : '▶' }}</span>
+        <span class="debug-section-title">提示词预览</span>
+        <button class="debug-action-btn" @click.stop="onBuildPreview" title="生成预览" :disabled="previewLoading">
+          {{ previewLoading ? '⏳' : '🔍' }}
+        </button>
+      </div>
+      <div v-if="showPromptPreview" class="debug-section-body">
+        <div v-if="!previewPrompts && !previewError" class="debug-empty">
+          点击 🔍 生成预览，查看将发送给 AI 的完整提示词
+        </div>
+        <div v-if="previewError" class="debug-empty" style="color: var(--lore-danger);">{{ previewError }}</div>
+
+        <template v-if="previewPrompts">
+          <!-- 一次调用模式 -->
+          <template v-if="previewPrompts.mode === 'onepass'">
+            <div v-for="(p, i) in previewPrompts.onepass" :key="i" class="debug-prompt-card">
+              <div class="debug-prompt-role">{{ p.role.toUpperCase() }}</div>
+              <pre class="debug-prompt-content">{{ p.content }}</pre>
+            </div>
+          </template>
+
+          <!-- 两次调用模式 -->
+          <template v-else>
+            <div class="debug-prompt-phase">第 1 次调用 — 筛选</div>
+            <div v-for="(p, i) in previewPrompts.triage" :key="'t'+i" class="debug-prompt-card">
+              <div class="debug-prompt-role">{{ p.role.toUpperCase() }}</div>
+              <pre class="debug-prompt-content">{{ p.content }}</pre>
+            </div>
+            <div class="debug-prompt-phase">第 2 次调用 — 更新</div>
+            <div v-for="(p, i) in previewPrompts.update" :key="'u'+i" class="debug-prompt-card">
+              <div class="debug-prompt-role">{{ p.role.toUpperCase() }}</div>
+              <pre class="debug-prompt-content">{{ p.content }}</pre>
+            </div>
+          </template>
+        </template>
+      </div>
+    </div>
+
+    <!-- 分组 4: 操作日志 -->
     <div class="debug-section">
       <div class="debug-section-header" @click="showLogs = !showLogs">
         <span class="debug-section-icon">{{ showLogs ? '▼' : '▶' }}</span>
@@ -135,14 +176,17 @@ import { useRuntimeStore } from '../../state';
 import { useSettingsStore } from '../../settings';
 import { useContextStore } from '../../core/worldbook-context';
 import { clearLogBuffer } from '../../logger';
+import { buildAnalysisRequest } from '../../core/update-pipeline';
+import { buildOnePassPrompts, buildTwoPassPrompts } from '../../core/ai-engine';
 
 const runtime = useRuntimeStore();
 const { settings } = useSettingsStore();
 const ctx = useContextStore();
 
 // ── 折叠状态 ──
-const showContext = ref(true);
-const showAiHistory = ref(true);
+const showContext = ref(false);
+const showAiHistory = ref(false);
+const showPromptPreview = ref(false);
 const showLogs = ref(false);
 
 // ── 日志过滤 ──
@@ -157,6 +201,43 @@ const filteredLogs = computed(() => {
 const aiHistoryReversed = computed(() =>
   runtime.aiCallHistory.slice().reverse(),
 );
+
+// ── 提示词预览 ──
+interface PromptPreviewOnepass { mode: 'onepass'; onepass: RolePrompt[] }
+interface PromptPreviewTwopass { mode: 'twopass'; triage: RolePrompt[]; update: RolePrompt[] }
+type PromptPreview = PromptPreviewOnepass | PromptPreviewTwopass;
+
+const previewPrompts = ref<PromptPreview | null>(null);
+const previewLoading = ref(false);
+const previewError = ref('');
+
+async function onBuildPreview() {
+  previewLoading.value = true;
+  previewError.value = '';
+  previewPrompts.value = null;
+
+  try {
+    const request = await buildAnalysisRequest();
+    if (!request) {
+      previewError.value = '无法构建请求：请确认已打开角色卡、有活跃世界书且聊天记录不为空';
+      return;
+    }
+
+    if (settings.lore_ai_mode === 'twopass') {
+      const { triage, update } = buildTwoPassPrompts(request);
+      previewPrompts.value = { mode: 'twopass', triage, update };
+    } else {
+      const prompts = buildOnePassPrompts(request);
+      previewPrompts.value = { mode: 'onepass', onepass: prompts };
+    }
+
+    toastr.success('提示词预览已生成', 'Lorevnter');
+  } catch (e) {
+    previewError.value = `构建失败: ${(e as Error).message}`;
+  } finally {
+    previewLoading.value = false;
+  }
+}
 
 // ── 操作 ──
 function onRefreshContext() {
@@ -308,4 +389,28 @@ onMounted(() => {
 .log-error .log-level { color: var(--lore-danger); }
 
 .debug-empty { font-size: 13px; color: var(--lore-text-secondary); text-align: center; padding: 20px; }
+
+/* 提示词预览 */
+.debug-prompt-card {
+  margin-bottom: 10px; border-radius: var(--lore-radius-sm);
+  background: var(--lore-bg-primary); border: 1px solid var(--lore-border-light);
+  overflow: hidden;
+}
+.debug-prompt-role {
+  padding: 6px 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+  background: var(--lore-accent-bg); color: var(--lore-accent);
+  border-bottom: 1px solid var(--lore-border-light);
+}
+.debug-prompt-content {
+  padding: 10px 12px; font-size: 12px; line-height: 1.5;
+  color: var(--lore-text-primary); font-family: monospace;
+  white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;
+  max-height: 300px; overflow-y: auto; margin: 0;
+}
+.debug-prompt-phase {
+  font-size: 12px; font-weight: 600; color: var(--lore-text-secondary);
+  padding: 8px 0 4px; margin-top: 8px;
+  border-top: 1px dashed var(--lore-border-light);
+}
+.debug-prompt-phase:first-child { border-top: none; margin-top: 0; }
 </style>

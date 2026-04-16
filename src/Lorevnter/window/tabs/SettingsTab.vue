@@ -73,9 +73,9 @@
       </div>
     </div>
 
-    <!-- ═══════════ AI 设置 ═══════════ -->
+    <!-- ═══════════ AI 配置 ═══════════ -->
     <div class="st-group">
-      <div class="st-group-title">AI 分析</div>
+      <div class="st-group-title">AI 配置</div>
 
       <div class="st-row">
         <div class="st-row-main">
@@ -96,7 +96,7 @@
             <option value="auto">自动触发</option>
           </select>
         </div>
-        <span class="st-hint">{{ settings.lore_scan_trigger === 'auto' ? '每隔设定轮数自动运行 AI 分析' : '仅在点击「AI 分析」按钮时运行' }}</span>
+        <span class="st-hint">{{ settings.lore_scan_trigger === 'auto' ? '每隔设定的 AI 回复轮数自动运行分析' : '仅在点击「AI 分析」按钮时运行' }}</span>
       </div>
 
       <div class="st-row">
@@ -105,6 +105,64 @@
           <input type="number" v-model.number="settings.lore_ai_max_context" class="st-number" min="1" max="50" />
         </div>
         <span class="st-hint">发送给 AI 的最近聊天消息条数</span>
+      </div>
+
+      <!-- 系统提示词（折叠） -->
+      <div class="st-collapsible">
+        <div class="st-collapsible-header" @click="showPromptEditor = !showPromptEditor">
+          <span class="st-collapsible-icon">{{ showPromptEditor ? '▼' : '▶' }}</span>
+          <span class="st-label">系统提示词</span>
+          <span class="st-collapsible-status">{{ settings.lore_ai_system_prompt ? '自定义' : '默认' }}</span>
+        </div>
+        <div v-if="showPromptEditor" class="st-collapsible-body">
+          <span class="st-hint">{{ settings.lore_ai_mode === 'twopass' ? '两次调用模式：用于第二次（更新）调用' : '一次调用模式：同时用于筛选和更新' }}。留空使用默认提示词。</span>
+          <textarea
+            v-model="settings.lore_ai_system_prompt"
+            class="st-textarea"
+            rows="6"
+            placeholder="支持 {{char}}、{{user}} 等宏变量"
+          ></textarea>
+          <button v-if="settings.lore_ai_system_prompt" class="st-btn st-btn-sm st-btn-danger" @click="settings.lore_ai_system_prompt = ''">
+            恢复默认
+          </button>
+        </div>
+      </div>
+
+      <!-- 采样参数（折叠 + 总开关） -->
+      <div class="st-collapsible">
+        <div class="st-collapsible-header" @click="showSamplingParams = !showSamplingParams">
+          <span class="st-collapsible-icon">{{ showSamplingParams ? '▼' : '▶' }}</span>
+          <span class="st-label">采样参数</span>
+          <span class="st-collapsible-status">{{ isAllSameAsPreset ? '跟随预设' : '自定义' }}</span>
+        </div>
+        <div v-if="showSamplingParams" class="st-collapsible-body">
+          <div class="st-row">
+            <div class="st-row-main">
+              <span class="st-label">全部跟随预设</span>
+              <input type="checkbox" class="ios-toggle" :checked="isAllSameAsPreset" @change="onToggleAllPreset" />
+            </div>
+            <span class="st-hint">开启后所有参数使用酒馆当前预设的值</span>
+          </div>
+
+          <template v-if="!isAllSameAsPreset">
+            <div class="st-param-grid">
+              <div class="st-param-item" v-for="param in samplingParams" :key="param.key">
+                <label class="st-param-label">
+                  <span>{{ param.label }}</span>
+                </label>
+                <input
+                  type="number"
+                  :value="settings[param.key] === 'same_as_preset' ? param.default : settings[param.key]"
+                  @input="settings[param.key] = Number(($event.target as HTMLInputElement).value)"
+                  class="st-number st-number-wide"
+                  :min="param.min"
+                  :max="param.max"
+                  :step="param.step"
+                />
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
     </div>
 
@@ -325,6 +383,32 @@ async function onTestConnection() {
 onMounted(() => {
   allWorldbooks.value = WorldbookAPI.listAll();
 });
+
+// ── 折叠状态 ──
+const showPromptEditor = ref(false);
+const showSamplingParams = ref(false);
+
+// ── 采样参数配置 ──
+type SamplingKey = 'lore_ai_temperature' | 'lore_ai_top_p' | 'lore_ai_max_tokens' | 'lore_ai_frequency_penalty' | 'lore_ai_presence_penalty';
+
+const samplingParams: { key: SamplingKey; label: string; min: number; max: number; step: number; default: number }[] = [
+  { key: 'lore_ai_temperature', label: 'Temperature', min: 0, max: 2, step: 0.05, default: 0.7 },
+  { key: 'lore_ai_top_p', label: 'Top P', min: 0, max: 1, step: 0.05, default: 0.9 },
+  { key: 'lore_ai_max_tokens', label: 'Max Tokens', min: 1, max: 16384, step: 1, default: 2048 },
+  { key: 'lore_ai_frequency_penalty', label: '频率惩罚', min: -2, max: 2, step: 0.1, default: 0 },
+  { key: 'lore_ai_presence_penalty', label: '存在惩罚', min: -2, max: 2, step: 0.1, default: 0 },
+];
+
+const isAllSameAsPreset = computed(() =>
+  samplingParams.every(p => (settings as any)[p.key] === 'same_as_preset'),
+);
+
+function onToggleAllPreset(event: Event) {
+  const checked = (event.target as HTMLInputElement).checked;
+  for (const p of samplingParams) {
+    (settings as any)[p.key] = checked ? 'same_as_preset' : p.default;
+  }
+}
 </script>
 
 <style scoped>
@@ -400,6 +484,26 @@ onMounted(() => {
 }
 .st-btn:hover:not(:disabled) { background: var(--lore-accent-bg); }
 .st-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.st-btn-sm { padding: 6px 12px; font-size: 12px; margin-top: 6px; }
+.st-btn-danger { color: var(--lore-danger); }
+.st-btn-danger:hover:not(:disabled) { background: var(--lore-danger-bg); }
+
+/* 折叠组件 */
+.st-collapsible {
+  background: var(--lore-bg-secondary); border-radius: var(--lore-radius-md);
+  overflow: hidden; margin-top: 2px;
+}
+.st-collapsible-header {
+  display: flex; align-items: center; gap: 8px; padding: 12px 14px;
+  cursor: pointer; transition: background .15s; min-height: 44px;
+}
+.st-collapsible-header:hover { background: var(--lore-bg-tertiary); }
+.st-collapsible-icon { font-size: 10px; color: var(--lore-text-tertiary); flex-shrink: 0; width: 12px; }
+.st-collapsible-status {
+  margin-left: auto; font-size: 12px; color: var(--lore-text-tertiary);
+  font-weight: 400;
+}
+.st-collapsible-body { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; }
 
 .st-wb-list { display: flex; flex-direction: column; gap: 4px; margin: 10px 0;}
 .st-wb-item {
@@ -448,4 +552,37 @@ onMounted(() => {
 .st-about-name { font-size: 18px; font-weight: 600; color: var(--lore-text-primary); letter-spacing: -0.5px;}
 .st-about-ver { font-size: 13px; color: var(--lore-text-secondary); font-variant-numeric: tabular-nums;}
 .st-about-desc { font-size: 13px; color: var(--lore-text-tertiary); margin-top: 4px;}
+
+/* Textarea */
+.st-textarea {
+  width: 100%; padding: 10px 12px; border-radius: var(--lore-radius-sm);
+  border: 1px solid var(--lore-border-light); background: var(--lore-bg-primary);
+  color: var(--lore-text-primary); font-size: 13px; font-family: monospace;
+  outline: none; resize: vertical; transition: border-color 0.2s;
+  margin-top: 6px; line-height: 1.5; min-height: 80px;
+}
+.st-textarea:focus { border-color: var(--lore-accent); }
+.st-textarea::placeholder { color: var(--lore-text-tertiary); }
+
+/* 采样参数网格 */
+.st-param-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.st-param-item {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px; border-radius: var(--lore-radius-sm);
+  background: var(--lore-bg-primary); border: 1px solid var(--lore-border-light);
+}
+.st-param-label {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 14px; font-weight: 500; color: var(--lore-text-primary);
+}
+.st-param-default {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--lore-text-secondary); cursor: pointer; font-weight: 400;
+}
+.st-param-default input { width: 14px; height: 14px; cursor: pointer; }
+.st-number-wide { width: 100%; }
+.st-param-preset-label {
+  font-size: 13px; color: var(--lore-text-tertiary); font-style: italic;
+  padding: 4px 0;
+}
 </style>

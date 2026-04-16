@@ -24,11 +24,22 @@ interface ApiCallerOptions {
 function buildCustomApiConfig(): CustomApiConfig | undefined {
   const { settings } = useSettingsStore();
 
+  // 构建采样参数（通用）
+  const samplingParams: Partial<CustomApiConfig> = {};
+  if (settings.lore_ai_temperature !== 'same_as_preset') samplingParams.temperature = settings.lore_ai_temperature;
+  if (settings.lore_ai_top_p !== 'same_as_preset') samplingParams.top_p = settings.lore_ai_top_p;
+  if (settings.lore_ai_max_tokens !== 'same_as_preset') samplingParams.max_tokens = settings.lore_ai_max_tokens;
+  if (settings.lore_ai_frequency_penalty !== 'same_as_preset') samplingParams.frequency_penalty = settings.lore_ai_frequency_penalty;
+  if (settings.lore_ai_presence_penalty !== 'same_as_preset') samplingParams.presence_penalty = settings.lore_ai_presence_penalty;
+
   if (settings.lore_api_source === 'tavern') {
-    // 复用酒馆当前连接，仅覆盖模型
-    return settings.lore_api_model
-      ? { model: settings.lore_api_model }
-      : undefined; // 完全使用酒馆默认
+    // 复用酒馆当前连接，仅覆盖模型和采样参数
+    const hasOverrides = settings.lore_api_model || Object.keys(samplingParams).length > 0;
+    if (!hasOverrides) return undefined; // 完全使用酒馆默认
+    return {
+      model: settings.lore_api_model || undefined,
+      ...samplingParams,
+    };
   }
 
   // 自定义端点
@@ -37,6 +48,7 @@ function buildCustomApiConfig(): CustomApiConfig | undefined {
     key: settings.lore_api_key || undefined,
     model: settings.lore_api_model || undefined,
     source: 'openai',
+    ...samplingParams,
   };
 }
 
@@ -367,4 +379,73 @@ function parseNameList(raw: string): string[] {
     logger.warn('名称列表解析失败');
     return [];
   }
+}
+
+// ── 提示词预览（纯组装，不调用 API） ──
+
+/** 组装一次调用模式的 prompt（用于调试预览） */
+export function buildOnePassPrompts(request: AnalysisRequest): RolePrompt[] {
+  const { settings } = useSettingsStore();
+
+  const systemPrompt = resolveMacros(
+    settings.lore_ai_system_prompt || DEFAULT_SYSTEM_PROMPT,
+    request.allEntries,
+  );
+
+  const entriesText = request.entries
+    .map((ae) => {
+      const constraintText = ae.constraint
+        ? `\n  约束: ${resolveMacros(ae.constraint.instruction, request.allEntries)}`
+        : '';
+      const macroText = getEntryMacro(ae.entry) ? ` (宏: {{${getEntryMacro(ae.entry)}}})` : '';
+      return `- ${ae.entry.name}${macroText}:${constraintText}\n  当前内容: ${ae.entry.content}`;
+    })
+    .join('\n\n');
+
+  const chatText = request.chatMessages.join('\n---\n');
+  const userPrompt = `## 世界书条目\n${entriesText}\n\n## 最近的对话内容\n${chatText}`;
+
+  return [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt },
+  ];
+}
+
+/** 组装两次调用模式的 prompt（用于调试预览） */
+export function buildTwoPassPrompts(request: AnalysisRequest): { triage: RolePrompt[]; update: RolePrompt[] } {
+  const { settings } = useSettingsStore();
+  const chatText = request.chatMessages.join('\n---\n');
+
+  // 第 1 次：筛选
+  const namesList = request.entries.map((ae) => `- ${ae.entry.name}`).join('\n');
+  const triagePrompt = `以下是所有世界书条目名称：\n${namesList}\n\n请阅读最近的对话内容，判断哪些条目需要更新。\n仅返回需要更新的条目名称列表，JSON 数组格式。\n\n## 最近的对话内容\n${chatText}`;
+
+  const triage: RolePrompt[] = [
+    { role: 'system', content: '你是世界书管理助手。请筛选需要更新的条目名称。仅返回 JSON 数组。' },
+    { role: 'user', content: triagePrompt },
+  ];
+
+  // 第 2 次：更新
+  const systemPrompt = resolveMacros(
+    settings.lore_ai_system_prompt || DEFAULT_SYSTEM_PROMPT,
+    request.allEntries,
+  );
+
+  const entriesText = request.entries
+    .map((ae) => {
+      const constraintText = ae.constraint
+        ? `\n  约束: ${resolveMacros(ae.constraint.instruction, request.allEntries)}`
+        : '';
+      return `- ${ae.entry.name}:${constraintText}\n  当前内容: ${ae.entry.content}`;
+    })
+    .join('\n\n');
+
+  const updatePrompt = `## 需要更新的条目\n${entriesText}\n\n## 最近的对话内容\n${chatText}`;
+
+  const update: RolePrompt[] = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: updatePrompt },
+  ];
+
+  return { triage, update };
 }

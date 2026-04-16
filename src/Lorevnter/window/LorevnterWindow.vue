@@ -111,20 +111,27 @@ const runtime = useRuntimeStore();
   font-size: 13px; color: var(--lore-text-secondary);
 }
 
-/* 分段控制器 Tabs (Segmented Control) */
+/* 分段控制器 Tabs (Segmented Control, 可滚动) */
 .lorevnter-tabs-container {
   padding: 10px 16px;
 }
 .lorevnter-tabs {
   display: flex; padding: 2px;
-  background: var(--lore-bg-primary); /* Use grouped bg for segment container */
+  background: var(--lore-bg-primary);
   border-radius: var(--lore-radius-sm);
   border: 1px solid var(--lore-border-light);
+  overflow-x: auto; flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch; /* iOS 惯性滚动 */
+  touch-action: pan-x; /* 精准横划 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.lorevnter-tabs::-webkit-scrollbar { display: none; }
 .lorevnter-tabs button {
-  flex: 1; padding: 6px 0; background: transparent; border: none;
+  flex: 1 0 auto; min-width: fit-content;
+  padding: 6px 12px; background: transparent; border: none;
   color: var(--lore-text-primary); font-size: 13px; font-weight: 500;
-  cursor: pointer; border-radius: 6px;
+  cursor: pointer; border-radius: 6px; white-space: nowrap;
   transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .lorevnter-tabs button.active {

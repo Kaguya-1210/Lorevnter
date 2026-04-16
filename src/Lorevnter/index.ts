@@ -8,7 +8,7 @@ import { useRuntimeStore } from './state';
 import { useSettingsStore } from './settings';
 import { useContextStore } from './core/worldbook-context';
 import { createScriptIdDiv, teleportStyle } from '@util/script';
-import { shouldAutoScan, runUpdatePipeline, resetMessageCount } from './core/update-pipeline';
+import { incrementAndCheckAutoScan, runUpdatePipeline, resetMessageCount } from './core/update-pipeline';
 import LorevnterWindow from './window/LorevnterWindow.vue';
 
 // 导入样式
@@ -125,10 +125,16 @@ $(() => {
     resetMessageCount();
   });
 
-  // 监听新消息（自动触发 AI 分析）
+  // 监听新消息（仅 AI 回复时计数，满足间隔则自动触发分析）
   eventOn(tavern_events.MESSAGE_RECEIVED, async () => {
-    if (shouldAutoScan()) {
-      logger.info('自动触发 AI 分析');
+    // 判断最后一条消息是否来自 AI
+    const chat = SillyTavern.chat;
+    if (!chat || chat.length === 0) return;
+    const lastMsg = chat[chat.length - 1];
+    if (lastMsg?.is_user) return; // 用户消息不计数
+
+    if (incrementAndCheckAutoScan()) {
+      logger.info('自动触发 AI 分析（AI 回复计数达到间隔）');
       await runUpdatePipeline();
     }
   });
