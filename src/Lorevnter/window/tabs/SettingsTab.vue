@@ -47,7 +47,7 @@
 
       <div class="st-row st-row-col">
         <span class="st-label">额外管理的世界书</span>
-        <span class="st-hint">除角色卡世界书外，额外指定 AI 分析与约束管理的世界书</span>
+        <span class="st-hint">除角色卡世界书外，额外指定 AI 分析与约束管理的世界书。全局世界书默认排除，可在此手动添加</span>
         <div class="st-wb-list">
           <div v-for="(name, i) in settings.lore_target_worldbooks" :key="i" class="st-wb-item">
             <span class="st-wb-name" :title="name">{{ name }}</span>
@@ -66,10 +66,10 @@
 
       <div class="st-row">
         <div class="st-row-main">
-          <span class="st-label">扫描间隔</span>
+          <span class="st-label">AI 回复间隔</span>
           <input type="number" v-model.number="settings.lore_scan_interval" class="st-number" min="1" max="99" />
         </div>
-        <span class="st-hint">自动模式下每 N 轮消息触发一次分析</span>
+        <span class="st-hint">自动模式下每隔 N 次 AI 回复触发一次分析（仅计 AI 回复，不计用户消息）</span>
       </div>
     </div>
 

@@ -4,6 +4,7 @@
 // ============================================================
 
 import { createLogger } from '../logger';
+import { useSettingsStore } from '../settings';
 import * as WorldbookAPI from './worldbook-api';
 
 const logger = createLogger('context');
@@ -101,7 +102,10 @@ export const useContextStore = defineStore('lorevnter_context', () => {
     }
   }
 
-  /** 获取当前活跃的所有世界书名称列表（去重） */
+  /** 获取当前活跃的所有世界书名称列表（去重）。
+   *  排除全局世界书（防止误修改跨角色共享数据），
+   *  额外世界书（lore_target_worldbooks）始终包含。
+   */
   function getActiveWorldbookNames(): string[] {
     const ctx = context.value;
     const names = new Set<string>();
@@ -110,11 +114,18 @@ export const useContextStore = defineStore('lorevnter_context', () => {
     if (ctx.character.primary) names.add(ctx.character.primary);
     for (const name of ctx.character.additional) names.add(name);
 
-    // 全局世界书
-    for (const name of ctx.global) names.add(name);
+    // 全局世界书 —— 排除（用户可通过额外世界书手动添加）
 
     // 聊天世界书
     if (ctx.chat) names.add(ctx.chat);
+
+    // 额外世界书（来自设置中用户手动指定）
+    try {
+      const { settings } = useSettingsStore();
+      for (const name of settings.lore_target_worldbooks) names.add(name);
+    } catch {
+      // settings 可能尚未初始化，忽略
+    }
 
     return [...names];
   }

@@ -195,23 +195,32 @@
         <template v-if="previewPrompts">
           <!-- 一次调用模式 -->
           <template v-if="previewPrompts.mode === 'onepass'">
-            <div v-for="(p, i) in previewPrompts.onepass" :key="i" class="debug-prompt-card">
-              <div class="debug-prompt-role">{{ p.role.toUpperCase() }}</div>
-              <pre class="debug-prompt-content">{{ p.content }}</pre>
+            <div v-for="(p, i) in previewPrompts.onepass" :key="i" class="debug-prompt-card" :class="'debug-prompt-' + p.role">
+              <div class="debug-prompt-role" :class="'debug-prompt-role-' + p.role">{{ p.role.toUpperCase() }}</div>
+              <pre class="debug-prompt-content" :class="{ 'debug-prompt-collapsed': !expandedPreviews[`o_${i}`] && p.content.length > 200 }" @click="togglePreviewExpand(`o_${i}`)">{{ p.content }}</pre>
+              <div v-if="p.content.length > 200" class="debug-prompt-expand" @click="togglePreviewExpand(`o_${i}`)">
+                {{ expandedPreviews[`o_${i}`] ? '收起 ▲' : '展开全文 ▼' }}
+              </div>
             </div>
           </template>
 
           <!-- 两次调用模式 -->
           <template v-else>
             <div class="debug-prompt-phase">第 1 次调用 — 筛选</div>
-            <div v-for="(p, i) in previewPrompts.triage" :key="'t'+i" class="debug-prompt-card">
-              <div class="debug-prompt-role">{{ p.role.toUpperCase() }}</div>
-              <pre class="debug-prompt-content">{{ p.content }}</pre>
+            <div v-for="(p, i) in previewPrompts.triage" :key="'t'+i" class="debug-prompt-card" :class="'debug-prompt-' + p.role">
+              <div class="debug-prompt-role" :class="'debug-prompt-role-' + p.role">{{ p.role.toUpperCase() }}</div>
+              <pre class="debug-prompt-content" :class="{ 'debug-prompt-collapsed': !expandedPreviews[`t_${i}`] && p.content.length > 200 }" @click="togglePreviewExpand(`t_${i}`)">{{ p.content }}</pre>
+              <div v-if="p.content.length > 200" class="debug-prompt-expand" @click="togglePreviewExpand(`t_${i}`)">
+                {{ expandedPreviews[`t_${i}`] ? '收起 ▲' : '展开全文 ▼' }}
+              </div>
             </div>
             <div class="debug-prompt-phase">第 2 次调用 — 更新</div>
-            <div v-for="(p, i) in previewPrompts.update" :key="'u'+i" class="debug-prompt-card">
-              <div class="debug-prompt-role">{{ p.role.toUpperCase() }}</div>
-              <pre class="debug-prompt-content">{{ p.content }}</pre>
+            <div v-for="(p, i) in previewPrompts.update" :key="'u'+i" class="debug-prompt-card" :class="'debug-prompt-' + p.role">
+              <div class="debug-prompt-role" :class="'debug-prompt-role-' + p.role">{{ p.role.toUpperCase() }}</div>
+              <pre class="debug-prompt-content" :class="{ 'debug-prompt-collapsed': !expandedPreviews[`u_${i}`] && p.content.length > 200 }" @click="togglePreviewExpand(`u_${i}`)">{{ p.content }}</pre>
+              <div v-if="p.content.length > 200" class="debug-prompt-expand" @click="togglePreviewExpand(`u_${i}`)">
+                {{ expandedPreviews[`u_${i}`] ? '收起 ▲' : '展开全文 ▼' }}
+              </div>
             </div>
           </template>
         </template>
@@ -291,6 +300,12 @@ const currentAiReplyCount = computed(() => getAiReplyCount());
 function onFetchApiSnapshot() {
   apiSnapshot.value = getApiSnapshot();
   toastr.success('API 配置已获取', 'Lorevnter');
+}
+
+// ── 提示词预览展开/折叠 ──
+const expandedPreviews = ref<Record<string, boolean>>({});
+function togglePreviewExpand(key: string) {
+  expandedPreviews.value[key] = !expandedPreviews.value[key];
 }
 
 // ── 日志过滤 ──
@@ -542,19 +557,38 @@ function startDiagnostics() {
 .debug-prompt-card {
   margin-bottom: 10px; border-radius: var(--lore-radius-sm);
   background: var(--lore-bg-primary); border: 1px solid var(--lore-border-light);
-  overflow: hidden;
+  overflow: hidden; transition: border-color 0.2s;
 }
+/* 按 role 分色边框 */
+.debug-prompt-system { border-left: 3px solid var(--lore-accent); }
+.debug-prompt-user { border-left: 3px solid #34c759; }
+.debug-prompt-assistant { border-left: 3px solid #ff9500; }
+
 .debug-prompt-role {
   padding: 6px 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
-  background: var(--lore-accent-bg); color: var(--lore-accent);
   border-bottom: 1px solid var(--lore-border-light);
 }
+/* 按 role 分色标签 */
+.debug-prompt-role-system { background: var(--lore-accent-bg); color: var(--lore-accent); }
+.debug-prompt-role-user { background: rgba(52, 199, 89, 0.12); color: #34c759; }
+.debug-prompt-role-assistant { background: rgba(255, 149, 0, 0.12); color: #ff9500; }
+
 .debug-prompt-content {
   padding: 10px 12px; font-size: 12px; line-height: 1.5;
   color: var(--lore-text-primary); font-family: monospace;
   white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;
-  max-height: 300px; overflow-y: auto; margin: 0;
+  max-height: none; overflow-y: auto; margin: 0;
+  cursor: pointer;
 }
+.debug-prompt-collapsed { max-height: 80px; overflow: hidden; }
+.debug-prompt-expand {
+  text-align: center; padding: 4px; font-size: 11px;
+  color: var(--lore-accent); cursor: pointer;
+  border-top: 1px dashed var(--lore-border-light);
+  transition: background 0.15s;
+}
+.debug-prompt-expand:hover { background: var(--lore-accent-bg); }
+
 .debug-prompt-phase {
   font-size: 12px; font-weight: 600; color: var(--lore-text-secondary);
   padding: 8px 0 4px; margin-top: 8px;
