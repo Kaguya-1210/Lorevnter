@@ -118,7 +118,7 @@ async function onAiAnalyze() {
   if (selectedName.value) {
     try {
       entries.value = await WorldbookAPI.fetch(selectedName.value);
-    } catch { /* 静默 */ }
+    } catch (e) { logger.warn(`AI 分析后刷新条目失败: ${(e as Error).message}`); }
   }
 }
 

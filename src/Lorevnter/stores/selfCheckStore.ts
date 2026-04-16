@@ -1,6 +1,3 @@
-import { defineStore } from 'pinia';
-import { ref } from 'vue';
-
 // ── 类型定义 ──
 export type CheckStatus = 'pending' | 'running' | 'success' | 'error';
 

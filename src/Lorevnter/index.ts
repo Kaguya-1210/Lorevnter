@@ -4,7 +4,7 @@
 // ============================================================
 
 import { createLogger, setDebugMode } from './logger';
-import { useRuntimeStore } from './state';
+import { useRuntimeStore, type TabName } from './state';
 import { useSettingsStore } from './settings';
 import { useContextStore } from './core/worldbook-context';
 import { createScriptIdDiv, teleportStyle } from '@util/script';
@@ -21,9 +21,9 @@ let app: ReturnType<typeof createApp> | null = null;
 let $appEl: JQuery | null = null;
 let styleDestroy: (() => void) | null = null;
 
-function showWindow(targetTab?: string) {
+function showWindow(targetTab?: TabName) {
   const runtime = useRuntimeStore();
-  if (targetTab) runtime.currentTab = targetTab as any;
+  if (targetTab) runtime.currentTab = targetTab;
 
   if (!app) {
     mountApp();

@@ -5,10 +5,23 @@
 import type { LogEntry } from './logger';
 import { getLogBuffer } from './logger';
 
+// ── AI 调用历史类型 ──
+export interface AiCallRecord {
+  timestamp: number;
+  mode: string;
+  inputEntries: number;
+  inputMessages: number;
+  outputUpdates: number;
+  appliedCount: number;
+  updates: Array<{ entryName: string; newContent: string; reason: string }>;
+}
+
+export type TabName = 'worldbooks' | 'constraints' | 'ai' | 'presets' | 'settings' | 'selfcheck' | 'logs';
+
 export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
   // ── 窗口状态 ──
   const windowVisible = ref(false);
-  const currentTab = ref<'worldbooks' | 'constraints' | 'ai' | 'presets' | 'settings' | 'selfcheck' | 'logs'>('worldbooks');
+  const currentTab = ref<TabName>('worldbooks');
 
   // ── 世界书浏览状态 ──
   /** 当前选中的世界书名（Tab 切换不丢失） */
@@ -23,15 +36,6 @@ export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
   const logEntries = ref<LogEntry[]>([]);
 
   // ── AI 调用历史 ──
-  interface AiCallRecord {
-    timestamp: number;
-    mode: string;
-    inputEntries: number;
-    inputMessages: number;
-    outputUpdates: number;
-    appliedCount: number;
-    updates: Array<{ entryName: string; newContent: string; reason: string }>;
-  }
   const aiCallHistory = ref<AiCallRecord[]>([]);
 
   /** 从 logger 缓冲区刷新日志到响应式状态 */

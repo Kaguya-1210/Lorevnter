@@ -87,12 +87,10 @@
 
 <script setup lang="ts">
 import { useSettingsStore } from '../../settings';
-import { useRuntimeStore } from '../../state';
 import * as WorldbookAPI from '../../core/worldbook-api';
 import { useContextStore } from '../../core/worldbook-context';
 
 const { settings } = useSettingsStore();
-const runtime = useRuntimeStore();
 const contextStore = useContextStore();
 
 const selectedWb = ref('');
@@ -114,15 +112,6 @@ function addWorldbook() {
 function removeWorldbook(index: number) {
   settings.lore_target_worldbooks.splice(index, 1);
 }
-
-// 开启调试模式 → 自动切到调试页；关闭 → 若在调试页则切回设置
-watch(() => settings.lore_debug_mode, (on) => {
-  if (on) {
-    runtime.currentTab = 'logs';
-  } else if (runtime.currentTab === 'logs') {
-    runtime.currentTab = 'settings';
-  }
-});
 
 onMounted(() => {
   allWorldbooks.value = WorldbookAPI.listAll();
@@ -252,15 +241,6 @@ onMounted(() => {
 .st-input:focus { border-color: var(--lore-accent); }
 .st-input::placeholder { color: var(--lore-text-tertiary); }
 
-.st-btn-test {
-  width: 100%; padding: 10px; text-align: center;
-  background: var(--lore-accent-bg); color: var(--lore-accent); font-weight: 600;
-}
-.st-btn-test:active:not(:disabled) { transform: scale(0.98); }
-
-.st-hint-ok { color: var(--lore-success); }
-.st-hint-err { color: var(--lore-danger); }
-
 .st-empty { font-size: 13px; color: var(--lore-text-secondary); text-align: center; padding: 10px 0; }
 
 .st-about {
@@ -270,37 +250,4 @@ onMounted(() => {
 .st-about-name { font-size: 18px; font-weight: 600; color: var(--lore-text-primary); letter-spacing: -0.5px;}
 .st-about-ver { font-size: 13px; color: var(--lore-text-secondary); font-variant-numeric: tabular-nums;}
 .st-about-desc { font-size: 13px; color: var(--lore-text-tertiary); margin-top: 4px;}
-
-/* Textarea */
-.st-textarea {
-  width: 100%; padding: 10px 12px; border-radius: var(--lore-radius-sm);
-  border: 1px solid var(--lore-border-light); background: var(--lore-bg-primary);
-  color: var(--lore-text-primary); font-size: 13px; font-family: monospace;
-  outline: none; resize: vertical; transition: border-color 0.2s;
-  margin-top: 6px; line-height: 1.5; min-height: 80px;
-}
-.st-textarea:focus { border-color: var(--lore-accent); }
-.st-textarea::placeholder { color: var(--lore-text-tertiary); }
-
-/* 采样参数网格 */
-.st-param-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
-.st-param-item {
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 10px 12px; border-radius: var(--lore-radius-sm);
-  background: var(--lore-bg-primary); border: 1px solid var(--lore-border-light);
-}
-.st-param-label {
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 14px; font-weight: 500; color: var(--lore-text-primary);
-}
-.st-param-default {
-  display: flex; align-items: center; gap: 4px;
-  font-size: 12px; color: var(--lore-text-secondary); cursor: pointer; font-weight: 400;
-}
-.st-param-default input { width: 14px; height: 14px; cursor: pointer; }
-.st-number-wide { width: 100%; }
-.st-param-preset-label {
-  font-size: 13px; color: var(--lore-text-tertiary); font-style: italic;
-  padding: 4px 0;
-}
 </style>

@@ -130,7 +130,7 @@
           <div class="st-row-main">
             <span class="st-label">API 密钥</span>
           </div>
-          <input v-model="settings.lore_api_key" type="password" class="st-input" placeholder="sk-..." />
+          <input v-model="settings.lore_api_key" type="password" class="st-input" placeholder="sk-..." autocomplete="new-password" />
         </div>
       </template>
 

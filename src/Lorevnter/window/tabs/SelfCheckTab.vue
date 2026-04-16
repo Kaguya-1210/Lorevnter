@@ -78,7 +78,6 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
 import { useSelfCheckStore } from '../../stores/selfCheckStore';
 import { testApiConnection } from '../../core/ai-engine';
 import * as WorldbookAPI from '../../core/worldbook-api';
@@ -92,7 +91,6 @@ onMounted(() => {
       title: '主渲染引擎',
       description: '探测宿主运行环境挂载点',
       action: async () => {
-        await new Promise(r => setTimeout(r, 600)); // 模拟渲染层探测
         return 'DOM 渲染一切正常，当前节点已被激活';
       }
     },
@@ -101,7 +99,6 @@ onMounted(() => {
       title: '局部世界书系统',
       description: '验证 SillyTavern Worldbook 数据流',
       action: async () => {
-        await new Promise(r => setTimeout(r, 500));
         const all = WorldbookAPI.listAll();
         if (all.length === 0) return '未发现可用世界书';
         return `缓存命中，共计载入 ${all.length} 本`;
@@ -109,23 +106,16 @@ onMounted(() => {
     },
     {
       id: 'ai-connectivity',
-      title: '智能引擎全双工通信',
-      description: '向云端认知网络发起握手测试',
+      title: 'AI 引擎连通性',
+      description: '向 API 端点发起握手测试',
       action: async () => {
+        const t0 = performance.now();
         const result = await testApiConnection();
+        const rtt = Math.round(performance.now() - t0);
         if (!result.ok) throw new Error(result.message);
-        return '握手成功，延迟 < 20ms';
+        return `握手成功，延迟 ${rtt}ms`;
       }
     },
-    {
-      id: 'protocol-auth',
-      title: '协议安全校验',
-      description: '跨源资源共享(CORS)与权限校验',
-      action: async () => {
-        await new Promise(r => setTimeout(r, 700));
-        return '安全策略通过验证';
-      }
-    }
   ]);
 });
 

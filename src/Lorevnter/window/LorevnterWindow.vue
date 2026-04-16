@@ -62,6 +62,15 @@ import DebugTab from './tabs/DebugTab.vue';
 
 const { settings } = useSettingsStore();
 const runtime = useRuntimeStore();
+
+// 开启调试模式 → 自动切到调试页；关闭 → 若在调试页则切回设置
+watch(() => settings.lore_debug_mode, (on) => {
+  if (on) {
+    runtime.currentTab = 'logs';
+  } else if (runtime.currentTab === 'logs' || runtime.currentTab === 'selfcheck') {
+    runtime.currentTab = 'settings';
+  }
+});
 </script>
 
 <style scoped>
@@ -142,7 +151,7 @@ const runtime = useRuntimeStore();
   padding: 6px 12px; background: transparent; border: none;
   color: var(--lore-text-primary); font-size: 13px; font-weight: 500;
   cursor: pointer; border-radius: 6px; white-space: nowrap;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: background 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .lorevnter-tabs button.active {
   background: var(--lore-bg-secondary);
