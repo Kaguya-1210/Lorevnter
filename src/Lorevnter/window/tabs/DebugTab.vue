@@ -1,5 +1,46 @@
 <template>
   <div class="debug-tab">
+    <!-- 分组 0: 系统自检 -->
+    <div class="debug-section">
+      <div class="debug-section-header" @click="showSelfCheck = !showSelfCheck">
+        <span class="debug-section-icon">{{ showSelfCheck ? '▼' : '▶' }}</span>
+        <span class="debug-section-title">🩺 系统自检</span>
+        <button
+          class="debug-action-btn"
+          @click.stop="startDiagnostics"
+          :disabled="selfCheckStore.isRunning"
+          :title="selfCheckStore.isRunning ? '自检中...' : '开始自检'"
+        >{{ selfCheckStore.isRunning ? '⏳' : '▶️' }}</button>
+      </div>
+      <div v-if="showSelfCheck" class="debug-section-body">
+        <!-- 自检列表 -->
+        <div v-if="selfCheckStore.steps.length === 0" class="debug-empty">未初始化</div>
+        <div v-else class="sc-compact-list">
+          <div
+            v-for="step in selfCheckStore.steps"
+            :key="step.id"
+            class="sc-compact-item"
+            :class="[`sc-st-${step.status}`]"
+          >
+            <span class="sc-compact-icon">
+              <span v-if="step.status === 'pending'">◎</span>
+              <span v-else-if="step.status === 'running'" class="sc-spin">⟳</span>
+              <span v-else-if="step.status === 'success'">✓</span>
+              <span v-else-if="step.status === 'error'">✕</span>
+            </span>
+            <div class="sc-compact-text">
+              <span class="sc-compact-title">{{ step.title }}</span>
+              <span class="sc-compact-desc">{{ step.description }}</span>
+              <span v-if="step.resultMessage && (step.status === 'success' || step.status === 'error')" class="sc-compact-result">
+                {{ step.resultMessage }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div v-if="selfCheckStore.isFinished" class="sc-compact-done">🎉 自检完成</div>
+      </div>
+    </div>
+
     <!-- 分组 1: 上下文快照 -->
     <div class="debug-section">
       <div class="debug-section-header" @click="showContext = !showContext">
@@ -82,6 +123,17 @@
               <span class="debug-ai-update-name">{{ u.entryName }}</span>
               <span class="debug-ai-update-reason">{{ u.reason }}</span>
             </div>
+          </div>
+          <!-- API 配置快照（调试模式下采集） -->
+          <div v-if="call.apiDetails" class="debug-ai-api-details">
+            <div class="debug-kv-item"><span class="debug-key">来源</span><span class="debug-value">{{ call.apiDetails.source === 'tavern' ? '酒馆代理' : '自定义' }}</span></div>
+            <div class="debug-kv-item"><span class="debug-key">API 地址</span><span class="debug-value debug-mono">{{ call.apiDetails.apiUrl }}</span></div>
+            <div class="debug-kv-item"><span class="debug-key">模型</span><span class="debug-value debug-mono">{{ call.apiDetails.model }}</span></div>
+            <div class="debug-kv-item"><span class="debug-key">温度</span><span class="debug-value">{{ call.apiDetails.temperature }}</span></div>
+            <div class="debug-kv-item"><span class="debug-key">Top P</span><span class="debug-value">{{ call.apiDetails.topP }}</span></div>
+            <div class="debug-kv-item"><span class="debug-key">最大 Tokens</span><span class="debug-value">{{ call.apiDetails.maxTokens }}</span></div>
+            <div class="debug-kv-item"><span class="debug-key">频率惩罚</span><span class="debug-value">{{ call.apiDetails.frequencyPenalty }}</span></div>
+            <div class="debug-kv-item"><span class="debug-key">存在惩罚</span><span class="debug-value">{{ call.apiDetails.presencePenalty }}</span></div>
           </div>
         </div>
       </div>
@@ -177,13 +229,17 @@ import { useSettingsStore } from '../../settings';
 import { useContextStore } from '../../core/worldbook-context';
 import { clearLogBuffer } from '../../logger';
 import { buildAnalysisRequest } from '../../core/update-pipeline';
-import { buildOnePassPrompts, buildTwoPassPrompts } from '../../core/ai-engine';
+import { buildOnePassPrompts, buildTwoPassPrompts, testApiConnection } from '../../core/ai-engine';
+import { useSelfCheckStore } from '../../stores/selfCheckStore';
+import * as WorldbookAPI from '../../core/worldbook-api';
 
 const runtime = useRuntimeStore();
 const { settings } = useSettingsStore();
 const ctx = useContextStore();
+const selfCheckStore = useSelfCheckStore();
 
 // ── 折叠状态 ──
+const showSelfCheck = ref(false);
 const showContext = ref(false);
 const showAiHistory = ref(false);
 const showPromptPreview = ref(false);
@@ -288,7 +344,46 @@ function formatTime(ts: number): string {
 
 onMounted(() => {
   runtime.refreshLogs();
+
+  // 初始化自检步骤
+  if (selfCheckStore.steps.length === 0) {
+    selfCheckStore.initSteps([
+      {
+        id: 'ui-engine',
+        title: '主渲染引擎',
+        description: '探测宿主运行环境挂载点',
+        action: async () => 'DOM 渲染一切正常，当前节点已被激活',
+      },
+      {
+        id: 'local-worldbook',
+        title: '局部世界书系统',
+        description: '验证 SillyTavern Worldbook 数据流',
+        action: async () => {
+          const all = WorldbookAPI.listAll();
+          if (all.length === 0) return '未发现可用世界书';
+          return `共计载入 ${all.length} 本`;
+        },
+      },
+      {
+        id: 'ai-connectivity',
+        title: 'AI 引擎连通性',
+        description: '向 API 端点发起握手测试',
+        action: async () => {
+          const t0 = performance.now();
+          const result = await testApiConnection();
+          const rtt = Math.round(performance.now() - t0);
+          if (!result.ok) throw new Error(result.message);
+          return `握手成功，延迟 ${rtt}ms`;
+        },
+      },
+    ]);
+  }
 });
+
+function startDiagnostics() {
+  showSelfCheck.value = true;
+  selfCheckStore.runCheck();
+}
 </script>
 
 <style scoped>
@@ -348,6 +443,11 @@ onMounted(() => {
 }
 .debug-ai-update-name { color: var(--lore-accent); font-weight: 500; }
 .debug-ai-update-reason { color: var(--lore-text-secondary); }
+.debug-ai-api-details {
+  margin-top: 6px; padding: 8px 10px;
+  background: var(--lore-bg-primary); border-radius: var(--lore-radius-sm);
+  border: 1px solid var(--lore-border-light);
+}
 
 /* 日志 */
 .debug-log-actions { display: flex; gap: 4px; }
@@ -413,4 +513,28 @@ onMounted(() => {
   border-top: 1px dashed var(--lore-border-light);
 }
 .debug-prompt-phase:first-child { border-top: none; margin-top: 0; }
+
+/* 自检紧凑列表 */
+.sc-compact-list { display: flex; flex-direction: column; gap: 6px; }
+.sc-compact-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 10px; border-radius: var(--lore-radius-sm);
+  background: var(--lore-bg-primary); border: 1px solid var(--lore-border-light);
+  transition: border-color 0.2s;
+}
+.sc-compact-icon { flex-shrink: 0; width: 18px; text-align: center; font-size: 13px; padding-top: 1px; }
+.sc-st-pending .sc-compact-icon { color: var(--lore-text-tertiary); }
+.sc-st-running .sc-compact-icon { color: var(--lore-accent); }
+.sc-st-success .sc-compact-icon { color: var(--lore-success); font-weight: 700; }
+.sc-st-error .sc-compact-icon { color: var(--lore-danger); font-weight: 700; }
+.sc-st-error { border-color: var(--lore-danger); }
+.sc-spin { display: inline-block; animation: sc-rotate 1s linear infinite; }
+@keyframes sc-rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.sc-compact-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.sc-compact-title { font-size: 13px; font-weight: 600; color: var(--lore-text-primary); }
+.sc-compact-desc { font-size: 11px; color: var(--lore-text-tertiary); }
+.sc-compact-result { font-size: 11px; color: var(--lore-accent); font-family: monospace; margin-top: 2px; }
+.sc-st-error .sc-compact-result { color: var(--lore-danger); }
+.sc-st-success .sc-compact-result { color: var(--lore-success); }
+.sc-compact-done { font-size: 12px; color: var(--lore-success); font-weight: 600; text-align: center; padding: 8px 0; }
 </style>

@@ -110,11 +110,11 @@
         <div class="st-row-main">
           <span class="st-label">连接方式</span>
           <select v-model="settings.lore_api_source" class="st-select" @change="onSourceChange">
-            <option value="tavern">与酒馆插头相同</option>
+            <option value="tavern">与酒馆相同（独立发送）</option>
             <option value="custom">自定义</option>
           </select>
         </div>
-        <span class="st-hint">{{ settings.lore_api_source === 'tavern' ? '复用酒馆当前 API 地址和密钥' : '使用自定义 API 端点' }}</span>
+        <span class="st-hint">{{ settings.lore_api_source === 'tavern' ? '读取酒馆当前 API 配置（地址、密钥），独立发送请求，不影响聊天流程' : '使用自定义 API 端点' }}</span>
       </div>
 
       <!-- 自定义 API 字段 -->

@@ -68,6 +68,26 @@ function buildApiCaller(): (opts: ApiCallerOptions) => Promise<string> {
   };
 }
 
+/**
+ * 获取当前 API 配置快照（用于调试记录）。
+ * 返回当前生效的 source、apiUrl、model、采样参数等。
+ */
+export function getApiSnapshot(): NonNullable<import('../state').AiCallRecord['apiDetails']> {
+  const { settings } = useSettingsStore();
+  const isTavern = settings.lore_api_source === 'tavern';
+
+  return {
+    source: isTavern ? 'tavern' : 'custom',
+    apiUrl: isTavern ? '(酒馆代理)' : (settings.lore_api_base_url || '(未配置)'),
+    model: settings.lore_api_model || (isTavern ? getTavernCurrentModel() || '(酒馆默认)' : '(未配置)'),
+    temperature: settings.lore_ai_temperature,
+    topP: settings.lore_ai_top_p,
+    maxTokens: settings.lore_ai_max_tokens,
+    frequencyPenalty: settings.lore_ai_frequency_penalty,
+    presencePenalty: settings.lore_ai_presence_penalty,
+  };
+}
+
 // ── 模型列表获取 ──
 
 /**

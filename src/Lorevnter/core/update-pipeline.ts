@@ -9,7 +9,7 @@ import { useContextStore } from './worldbook-context';
 import { useRuntimeStore } from '../state';
 import { getEntryConstraint } from './constraints';
 import * as WorldbookAPI from './worldbook-api';
-import { analyzeOnePass, analyzeTwoPass, type AnalysisEntry, type AnalysisRequest } from './ai-engine';
+import { analyzeOnePass, analyzeTwoPass, getApiSnapshot, type AnalysisEntry, type AnalysisRequest } from './ai-engine';
 
 const logger = createLogger('pipeline');
 
@@ -201,14 +201,18 @@ function recordAiCall(
 ): void {
   try {
     const runtime = useRuntimeStore();
+    const { settings } = useSettingsStore();
+
     runtime.aiCallHistory.push({
       timestamp: Date.now(),
-      mode: useSettingsStore().settings.lore_ai_mode,
+      mode: settings.lore_ai_mode,
       inputEntries: request.entries.length,
       inputMessages: request.chatMessages.length,
       outputUpdates: result.updates.length,
       appliedCount,
       updates: result.updates,
+      // 调试模式下采集 API 配置快照
+      apiDetails: settings.lore_debug_mode ? getApiSnapshot() : undefined,
     });
   } catch {
     // 静默，不影响主流程

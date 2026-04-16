@@ -23,11 +23,6 @@
           <button :class="{ active: runtime.currentTab === 'settings' }" @click="runtime.currentTab = 'settings'">设置</button>
           <button
             v-show="settings.lore_debug_mode"
-            :class="{ active: runtime.currentTab === 'selfcheck' }"
-            @click="runtime.currentTab = 'selfcheck'"
-          >自检</button>
-          <button
-            v-show="settings.lore_debug_mode"
             :class="{ active: runtime.currentTab === 'logs' }"
             @click="runtime.currentTab = 'logs'"
           >调试</button>
@@ -40,7 +35,6 @@
         <AiConfigTab v-else-if="runtime.currentTab === 'ai'" />
         <PresetsTab v-else-if="runtime.currentTab === 'presets'" />
         <SettingsTab v-else-if="runtime.currentTab === 'settings'" />
-        <SelfCheckTab v-else-if="runtime.currentTab === 'selfcheck'" />
 
         <DebugTab v-else-if="runtime.currentTab === 'logs'" />
       </div>
@@ -57,7 +51,6 @@ import ConstraintsTab from './tabs/ConstraintsTab.vue';
 import PresetsTab from './tabs/PresetsTab.vue';
 import AiConfigTab from './tabs/AiConfigTab.vue';
 import SettingsTab from './tabs/SettingsTab.vue';
-import SelfCheckTab from './tabs/SelfCheckTab.vue';
 import DebugTab from './tabs/DebugTab.vue';
 
 const { settings } = useSettingsStore();
@@ -67,7 +60,7 @@ const runtime = useRuntimeStore();
 watch(() => settings.lore_debug_mode, (on) => {
   if (on) {
     runtime.currentTab = 'logs';
-  } else if (runtime.currentTab === 'logs' || runtime.currentTab === 'selfcheck') {
+  } else if (runtime.currentTab === 'logs') {
     runtime.currentTab = 'settings';
   }
 });

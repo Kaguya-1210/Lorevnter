@@ -177,11 +177,9 @@ function onDelete() {
   selectedId.value = null;
 }
 
-// ── 引用计数（简化实现，从缓存统计） ──
-function getRefCount(constraintId: string): number {
-  // 从 runtime worldBookCache 统计
-  const runtime = useSettingsStore(); // 暂用 settings，后续可改为 runtime
-  // 简化：返回 0，实际会在 P7 补全
+// ── 引用计数（待实现） ──
+function getRefCount(_constraintId: string): number {
+  // TODO: 后续从世界书条目中统计引用次数
   return 0;
 }
 

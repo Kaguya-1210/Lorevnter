@@ -14,9 +14,20 @@ export interface AiCallRecord {
   outputUpdates: number;
   appliedCount: number;
   updates: Array<{ entryName: string; newContent: string; reason: string }>;
+  /** 调试模式下采集的 API 配置快照 */
+  apiDetails?: {
+    source: 'tavern' | 'custom';
+    apiUrl: string;
+    model: string;
+    temperature: number | string;
+    topP: number | string;
+    maxTokens: number | string;
+    frequencyPenalty: number | string;
+    presencePenalty: number | string;
+  };
 }
 
-export type TabName = 'worldbooks' | 'constraints' | 'ai' | 'presets' | 'settings' | 'selfcheck' | 'logs';
+export type TabName = 'worldbooks' | 'constraints' | 'ai' | 'presets' | 'settings' | 'logs';
 
 export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
   // ── 窗口状态 ──
@@ -26,10 +37,6 @@ export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
   // ── 世界书浏览状态 ──
   /** 当前选中的世界书名（Tab 切换不丢失） */
   const worldbookSelectedName = ref<string | null>(null);
-
-  // ── 世界书数据缓存 ──
-  /** key = 世界书名称, value = 条目列表 */
-  const worldBookCache = ref<Record<string, WorldbookEntry[]>>({});
 
   // ── 日志（引用 logger 模块的缓冲区） ──
   /** 响应式日志快照，通过 refreshLogs() 手动刷新 */
@@ -52,7 +59,6 @@ export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
     windowVisible,
     currentTab,
     worldbookSelectedName,
-    worldBookCache,
     logEntries,
     aiCallHistory,
     refreshLogs,

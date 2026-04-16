@@ -4,7 +4,6 @@
 // ============================================================
 
 import { createLogger } from '../logger';
-import { useRuntimeStore } from '../state';
 
 const logger = createLogger('core');
 
@@ -34,15 +33,12 @@ export function getActive(): {
   return { global, character, chat };
 }
 
-/** 获取世界书条目并缓存到 state */
+/** 获取世界书条目 */
 export async function fetch(name: string): Promise<WorldbookEntry[]> {
   logger.info(`获取世界书: ${name}`);
   try {
     const entries = await getWorldbook(name);
-    // 写入缓存
-    const runtime = useRuntimeStore();
-    runtime.worldBookCache[name] = entries;
-    logger.info(`世界书已缓存: ${name} (${entries.length} 条条目)`);
+    logger.info(`世界书已获取: ${name} (${entries.length} 条条目)`);
     return entries;
   } catch (e) {
     logger.error(`获取世界书失败: ${name} — ${(e as Error).message}`);
@@ -59,8 +55,6 @@ export async function save(name: string, entries: PartialDeep<WorldbookEntry>[])
   logger.info(`保存世界书: ${name} (${entries.length} 条条目)`);
   try {
     await replaceWorldbook(name, entries);
-    // 刷新缓存
-    await fetch(name);
     logger.info(`世界书已保存: ${name}`);
   } catch (e) {
     logger.error(`保存世界书失败: ${name} — ${(e as Error).message}`);
@@ -79,9 +73,6 @@ export async function updateEntry(
     const result = await updateWorldbookWith(name, (entries) =>
       entries.map((entry) => (entry.uid === uid ? { ...entry, ...patch } : entry)),
     );
-    // 刷新缓存
-    const runtime = useRuntimeStore();
-    runtime.worldBookCache[name] = result;
     logger.info(`条目已更新: ${name} uid=${uid}`);
     return result;
   } catch (e) {
@@ -98,9 +89,6 @@ export async function createEntries(
   logger.info(`新增条目: ${name} (${newEntries.length} 条)`);
   try {
     const result = await createWorldbookEntries(name, newEntries);
-    // 刷新缓存
-    const runtime = useRuntimeStore();
-    runtime.worldBookCache[name] = result.worldbook;
     logger.info(`条目已新增: ${name} (${result.new_entries.length} 条)`);
     return result;
   } catch (e) {
@@ -117,9 +105,6 @@ export async function deleteEntries(
   logger.info(`删除条目: ${name}`);
   try {
     const result = await deleteWorldbookEntries(name, predicate);
-    // 刷新缓存
-    const runtime = useRuntimeStore();
-    runtime.worldBookCache[name] = result.worldbook;
     logger.info(`条目已删除: ${name} (${result.deleted_entries.length} 条)`);
     return result;
   } catch (e) {
@@ -151,9 +136,6 @@ export async function remove(name: string): Promise<boolean> {
   try {
     const success = await deleteWorldbook(name);
     if (success) {
-      // 清除缓存
-      const runtime = useRuntimeStore();
-      delete runtime.worldBookCache[name];
       logger.info(`世界书已删除: ${name}`);
     } else {
       logger.warn(`世界书删除失败（可能不存在）: ${name}`);

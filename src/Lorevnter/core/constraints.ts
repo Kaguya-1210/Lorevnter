@@ -68,10 +68,9 @@ export function getConstraintById(id: string): LoreConstraint | null {
   return settings.lore_constraints.find(c => c.id === id) ?? null;
 }
 
-/** 统计某约束被引用的条目数（基于缓存） */
+/** 统计某约束被引用的条目数 */
 export function countConstraintRefs(_constraintId: string): number {
-  // 从 runtime worldBookCache 中遍历
-  // TODO: 实际实现需要从 state.ts 获取 worldBookCache
+  // TODO: 后续遍历活跃世界书的条目统计引用次数
   return 0;
 }
 

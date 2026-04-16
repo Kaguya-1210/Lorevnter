@@ -29,7 +29,7 @@
       <select v-model="selectedName" class="wb-select" @change="onSelectChange">
         <option :value="null">选择一本世界书...</option>
         <option v-for="name in allNames" :key="name" :value="name">
-          {{ name }}{{ runtime.worldBookCache[name] ? ` (${runtime.worldBookCache[name].length} 条)` : '' }}
+          {{ name }}{{ entryCounts[name] ? ` (${entryCounts[name]} 条)` : '' }}
         </option>
       </select>
     </div>
@@ -63,6 +63,7 @@ const logger = createLogger('worldbooks-tab');
 const runtime = useRuntimeStore();
 
 const allNames = ref<string[]>([]);
+const entryCounts = ref<Record<string, number>>({});
 const selectedName = computed({
   get: () => runtime.worldbookSelectedName,
   set: (v) => { runtime.worldbookSelectedName = v; },
@@ -88,6 +89,7 @@ async function loadEntries(name: string, silent = false) {
   loading.value = true;
   try {
     entries.value = await WorldbookAPI.fetch(name);
+    entryCounts.value[name] = entries.value.length;
     if (!silent) toastr.success(`已加载: ${name} (${entries.value.length} 条)`, 'Lorevnter');
   } catch (e) {
     logger.error(`加载世界书失败: ${(e as Error).message}`);
