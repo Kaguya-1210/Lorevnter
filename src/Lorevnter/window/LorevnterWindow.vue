@@ -21,7 +21,11 @@
           <button :class="{ active: runtime.currentTab === 'ai' }" @click="runtime.currentTab = 'ai'">AI 配置</button>
           <button :class="{ active: runtime.currentTab === 'presets' }" @click="runtime.currentTab = 'presets'">预设</button>
           <button :class="{ active: runtime.currentTab === 'settings' }" @click="runtime.currentTab = 'settings'">设置</button>
-          <button :class="{ active: runtime.currentTab === 'selfcheck' }" @click="runtime.currentTab = 'selfcheck'">自检</button>
+          <button
+            v-show="settings.lore_debug_mode"
+            :class="{ active: runtime.currentTab === 'selfcheck' }"
+            @click="runtime.currentTab = 'selfcheck'"
+          >自检</button>
           <button
             v-show="settings.lore_debug_mode"
             :class="{ active: runtime.currentTab === 'logs' }"
