@@ -193,16 +193,22 @@ function refreshBackups() {
 
 async function onManualBackup() {
   if (!selectedName.value) {
-    toastr.warning('请先选择一本世界书', 'Lorevnter');
+    toastr.warning('请先在下方选择一本世界书', 'Lorevnter');
     return;
   }
-  const result = await BackupManager.createBackup(selectedName.value, 'manual');
-  if (result) {
-    toastr.success(`已备份: ${result.worldbookName} (${result.entryCount} 条)`, 'Lorevnter');
-  } else {
-    toastr.info('无需备份（内容无变化或无条目）', 'Lorevnter');
+  try {
+    toastr.info(`正在备份: ${selectedName.value}...`, 'Lorevnter');
+    const result = await BackupManager.createBackup(selectedName.value, 'manual');
+    if (result) {
+      toastr.success(`已备份: ${result.worldbookName} (${result.entryCount} 条)`, 'Lorevnter');
+    } else {
+      toastr.info('无需备份（内容无变化或无条目）', 'Lorevnter');
+    }
+    refreshBackups();
+  } catch (e) {
+    toastr.error(`备份失败: ${(e as Error).message}`, 'Lorevnter');
+    logger.error(`手动备份失败: ${(e as Error).message}`);
   }
-  refreshBackups();
 }
 
 function onRestoreBackup(bk: BackupRecord) {

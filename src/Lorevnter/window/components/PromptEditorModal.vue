@@ -223,6 +223,7 @@ function onDeletePreset() {
 .pe-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 20px; border-bottom: 1px solid var(--lore-border-light);
+  flex-shrink: 0;
 }
 .pe-title { font-size: 16px; font-weight: 600; color: var(--lore-text-primary); }
 .pe-close-btn {
@@ -239,6 +240,7 @@ function onDeletePreset() {
   display: flex; align-items: center; gap: 6px;
   padding: 10px 20px; border-bottom: 1px solid var(--lore-border-light);
   background: var(--lore-bg-primary);
+  flex-shrink: 0;
 }
 .pe-select {
   flex: 1; padding: 6px 10px; border-radius: var(--lore-radius-sm);
