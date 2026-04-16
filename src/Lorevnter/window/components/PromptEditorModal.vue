@@ -351,14 +351,25 @@ function onDeletePreset() {
 }
 .pe-add-btn:hover { background: var(--lore-accent-bg); border-color: var(--lore-accent); }
 
-/* 移动端适配 */
-@media (max-width: 480px) {
+/* 移动端适配 — 近全屏面板 */
+@media (max-width: 600px) {
   .pe-overlay { align-items: flex-end; }
   .pe-modal {
-    width: 100vw; max-height: 90vh;
-    border-radius: var(--lore-radius-lg) var(--lore-radius-lg) 0 0;
+    width: 100vw;
+    max-height: calc(100vh - env(safe-area-inset-top, 20px));
+    height: calc(100vh - env(safe-area-inset-top, 20px));
+    border-radius: 16px 16px 0 0;
     padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
   }
+  .pe-list {
+    flex: 1;
+    min-height: 0; /* flex 子项需要 min-height:0 才能正确缩放 */
+  }
+  .pe-header { padding: 12px 16px; }
+  .pe-preset-bar { padding: 8px 16px; }
+  .pe-list { padding: 10px 16px; }
+  .pe-footer { padding: 10px 16px; }
   .pe-item-preview { display: none; }
+  .pe-edit-textarea { min-height: 80px; }
 }
 </style>
