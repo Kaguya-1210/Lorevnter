@@ -247,6 +247,7 @@ async function confirmRestore() {
 }
 
 function onDeleteBackup(bk: BackupRecord) {
+  if (!confirm(`确定删除备份「${bk.worldbookName}」(${new Date(bk.timestamp).toLocaleString()})？`)) return;
   BackupManager.deleteBackup(bk.id);
   toastr.info(`已删除备份`, 'Lorevnter');
   refreshBackups();

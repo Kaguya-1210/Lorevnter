@@ -43,18 +43,16 @@
         <span class="st-hint">发送给 AI 的最近聊天消息条数</span>
       </div>
 
-      <!-- 系统提示词（弹窗编辑） -->
+      <!-- 系统提示词（原生弹窗编辑） -->
       <div class="st-row">
         <div class="st-row-main">
           <span class="st-label">提示词</span>
-          <button class="st-btn st-btn-sm" @click="showPromptModal = true">
+          <button class="st-btn st-btn-sm" @click="onOpenPromptEditor">
             编辑提示词 ({{ settings.lore_ai_prompt_list.length || '默认' }})
           </button>
         </div>
         <span class="st-hint">{{ settings.lore_ai_prompt_list.length > 0 ? `已配置 ${settings.lore_ai_prompt_list.filter(p => p.enabled).length} 条启用的提示词` : '使用内置默认提示词，点击编辑可自定义' }}</span>
       </div>
-
-      <PromptEditorModal :visible="showPromptModal" @close="showPromptModal = false" />
 
       <!-- 采样参数（折叠 + 总开关） -->
       <div class="st-collapsible">
@@ -193,16 +191,18 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { useSettingsStore } from '../../settings';
+<script setup lang="ts">import { useSettingsStore } from '../../settings';
 import { testApiConnection, fetchModelList, getTavernCurrentModel } from '../../core/ai-engine';
-import PromptEditorModal from '../components/PromptEditorModal.vue';
+import { openPromptEditor } from '../../core/prompt-editor';
 
 const { settings } = useSettingsStore();
 
 // ── 折叠状态 ──
-const showPromptModal = ref(false);
 const showSamplingParams = ref(false);
+
+function onOpenPromptEditor() {
+  openPromptEditor();
+}
 
 // ── 酒馆模型 ──
 const tavernModel = computed(() => getTavernCurrentModel());
