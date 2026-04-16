@@ -17,6 +17,25 @@ const LoreConstraintSchema = z.object({
 });
 export type LoreConstraint = z.infer<typeof LoreConstraintSchema>;
 
+// ── 提示词条目 Schema ──
+const PromptItemSchema = z.object({
+  id: z.string(),
+  role: z.enum(['system', 'user', 'assistant']),
+  content: z.string(),
+  enabled: z.boolean().default(true),
+  name: z.string().default(''),
+});
+export type PromptItem = z.infer<typeof PromptItemSchema>;
+
+// ── 提示词预设 Schema（独立于全局预设） ──
+const PromptPresetSchema = z.object({
+  name: z.string(),
+  description: z.string().default(''),
+  createdAt: z.string(),
+  items: z.array(PromptItemSchema),
+});
+export type PromptPreset = z.infer<typeof PromptPresetSchema>;
+
 // ── 预设业务数据子集 ──
 // 预设只快照这些字段，不包含主题/调试/开关等设置项
 const PresetDataSchema = z.object({
@@ -61,8 +80,10 @@ const LorevnterSettings = z
     // ── AI 配置（不纳入预设） ──
     /** AI 分析模式 */
     lore_ai_mode: z.enum(['onepass', 'twopass']).default('onepass'),
-    /** AI 系统提示词模板 */
+    /** AI 系统提示词模板（旧字段，兼容回退） */
     lore_ai_system_prompt: z.string().default(''),
+    /** AI 提示词列表（新，优先使用） */
+    lore_ai_prompt_list: z.array(PromptItemSchema).default([]),
     /** AI 最大上下文消息数 */
     lore_ai_max_context: z.number().default(10),
     /** 触发模式 */
@@ -94,6 +115,8 @@ const LorevnterSettings = z
 
     // ── 预设列表 ──
     lore_presets: z.array(PresetSchema).default([]),
+    /** 提示词预设（独立于全局预设） */
+    lore_prompt_presets: z.array(PromptPresetSchema).default([]),
   })
   .prefault({});
 

@@ -34,26 +34,18 @@
         <span class="st-hint">发送给 AI 的最近聊天消息条数</span>
       </div>
 
-      <!-- 系统提示词（折叠） -->
-      <div class="st-collapsible">
-        <div class="st-collapsible-header" @click="showPromptEditor = !showPromptEditor">
-          <span class="st-collapsible-icon">{{ showPromptEditor ? '▼' : '▶' }}</span>
-          <span class="st-label">系统提示词</span>
-          <span class="st-collapsible-status">{{ settings.lore_ai_system_prompt ? '自定义' : '默认' }}</span>
-        </div>
-        <div v-if="showPromptEditor" class="st-collapsible-body">
-          <span class="st-hint">{{ settings.lore_ai_mode === 'twopass' ? '两次调用模式：用于第二次（更新）调用' : '一次调用模式：同时用于筛选和更新' }}。留空使用默认提示词。</span>
-          <textarea
-            v-model="settings.lore_ai_system_prompt"
-            class="st-textarea"
-            rows="6"
-            placeholder="支持 {{char}}、{{user}} 等宏变量"
-          ></textarea>
-          <button v-if="settings.lore_ai_system_prompt" class="st-btn st-btn-sm st-btn-danger" @click="settings.lore_ai_system_prompt = ''">
-            恢复默认
+      <!-- 系统提示词（弹窗编辑） -->
+      <div class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">提示词</span>
+          <button class="st-btn st-btn-sm" @click="showPromptModal = true">
+            编辑提示词 ({{ settings.lore_ai_prompt_list.length || '默认' }})
           </button>
         </div>
+        <span class="st-hint">{{ settings.lore_ai_prompt_list.length > 0 ? `已配置 ${settings.lore_ai_prompt_list.filter(p => p.enabled).length} 条启用的提示词` : '使用内置默认提示词，点击编辑可自定义' }}</span>
       </div>
+
+      <PromptEditorModal :visible="showPromptModal" @close="showPromptModal = false" />
 
       <!-- 采样参数（折叠 + 总开关） -->
       <div class="st-collapsible">
@@ -195,11 +187,12 @@
 <script setup lang="ts">
 import { useSettingsStore } from '../../settings';
 import { testApiConnection, fetchModelList, getTavernCurrentModel } from '../../core/ai-engine';
+import PromptEditorModal from '../components/PromptEditorModal.vue';
 
 const { settings } = useSettingsStore();
 
 // ── 折叠状态 ──
-const showPromptEditor = ref(false);
+const showPromptModal = ref(false);
 const showSamplingParams = ref(false);
 
 // ── 酒馆模型 ──
