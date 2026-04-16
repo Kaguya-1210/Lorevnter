@@ -20,7 +20,7 @@
       </div>
       <div v-if="showBackups" class="wb-backup-body">
         <div class="wb-backup-toolbar">
-          <button class="wb-btn" @click="onManualBackup" :disabled="!selectedName">💾 手动备份当前</button>
+          <button class="wb-btn" @click="onManualBackup">💾 手动备份</button>
           <button class="wb-btn" @click="onImportBackup">📥 导入</button>
           <button class="wb-btn" @click="onExportAllBackups" :disabled="backupList.length === 0">📤 导出全部</button>
           <button class="wb-btn wb-btn-danger" @click="onClearAllBackups" :disabled="backupList.length === 0">🗑 清空</button>
@@ -110,6 +110,7 @@ import { useRuntimeStore } from '../../state';
 import * as WorldbookAPI from '../../core/worldbook-api';
 import { runUpdatePipeline } from '../../core/update-pipeline';
 import { createLogger } from '../../logger';
+import { useContextStore } from '../../core/worldbook-context';
 import * as BackupManager from '../../core/backup-manager';
 import type { BackupRecord } from '../../core/backup-manager';
 
@@ -192,17 +193,23 @@ function refreshBackups() {
 }
 
 async function onManualBackup() {
-  if (!selectedName.value) {
-    toastr.warning('请先在下方选择一本世界书', 'Lorevnter');
+  const ctx = useContextStore();
+  const names = ctx.getActiveWorldbookNames();
+  if (names.length === 0) {
+    toastr.warning('当前无活跃的世界书，请先打开角色卡', 'Lorevnter');
     return;
   }
   try {
-    toastr.info(`正在备份: ${selectedName.value}...`, 'Lorevnter');
-    const result = await BackupManager.createBackup(selectedName.value, 'manual');
-    if (result) {
-      toastr.success(`已备份: ${result.worldbookName} (${result.entryCount} 条)`, 'Lorevnter');
+    toastr.info(`正在备份 ${names.length} 个世界书...`, 'Lorevnter');
+    let created = 0;
+    for (const name of names) {
+      const result = await BackupManager.createBackup(name, 'manual');
+      if (result) created++;
+    }
+    if (created > 0) {
+      toastr.success(`已备份 ${created} 个世界书`, 'Lorevnter');
     } else {
-      toastr.info('无需备份（内容无变化或无条目）', 'Lorevnter');
+      toastr.info('所有世界书内容无变化，跳过备份', 'Lorevnter');
     }
     refreshBackups();
   } catch (e) {
