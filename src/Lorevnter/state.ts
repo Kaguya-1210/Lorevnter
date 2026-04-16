@@ -8,7 +8,7 @@ import { getLogBuffer } from './logger';
 export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
   // ── 窗口状态 ──
   const windowVisible = ref(false);
-  const currentTab = ref<'worldbooks' | 'constraints' | 'presets' | 'settings' | 'logs'>('worldbooks');
+  const currentTab = ref<'worldbooks' | 'constraints' | 'ai' | 'presets' | 'settings' | 'selfcheck' | 'logs'>('worldbooks');
 
   // ── 世界书浏览状态 ──
   /** 当前选中的世界书名（Tab 切换不丢失） */
