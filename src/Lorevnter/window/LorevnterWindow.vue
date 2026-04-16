@@ -18,6 +18,7 @@
         <div class="lorevnter-tabs">
           <button :class="{ active: runtime.currentTab === 'worldbooks' }" @click="runtime.currentTab = 'worldbooks'">世界书</button>
           <button :class="{ active: runtime.currentTab === 'constraints' }" @click="runtime.currentTab = 'constraints'">约束</button>
+          <button :class="{ active: runtime.currentTab === 'ai' }" @click="runtime.currentTab = 'ai'">AI 配置</button>
           <button :class="{ active: runtime.currentTab === 'presets' }" @click="runtime.currentTab = 'presets'">预设</button>
           <button :class="{ active: runtime.currentTab === 'settings' }" @click="runtime.currentTab = 'settings'">设置</button>
           <button
@@ -31,6 +32,7 @@
       <div class="lorevnter-body">
         <WorldbooksTab v-if="runtime.currentTab === 'worldbooks'" />
         <ConstraintsTab v-else-if="runtime.currentTab === 'constraints'" />
+        <AiConfigTab v-else-if="runtime.currentTab === 'ai'" />
         <PresetsTab v-else-if="runtime.currentTab === 'presets'" />
         <SettingsTab v-else-if="runtime.currentTab === 'settings'" />
 
@@ -47,6 +49,7 @@ import ContextBar from './components/ContextBar.vue';
 import WorldbooksTab from './tabs/WorldbooksTab.vue';
 import ConstraintsTab from './tabs/ConstraintsTab.vue';
 import PresetsTab from './tabs/PresetsTab.vue';
+import AiConfigTab from './tabs/AiConfigTab.vue';
 import SettingsTab from './tabs/SettingsTab.vue';
 import DebugTab from './tabs/DebugTab.vue';
 
