@@ -201,7 +201,12 @@ const { settings } = useSettingsStore();
 const showSamplingParams = ref(false);
 
 function onOpenPromptEditor() {
-  openPromptEditor();
+  try {
+    openPromptEditor();
+  } catch (e) {
+    console.error('[Lorevnter] 提示词编辑器打开失败:', e);
+    toastr.error(`编辑器打开失败: ${(e as Error).message}`, 'Lorevnter');
+  }
 }
 
 // ── 酒馆模型 ──

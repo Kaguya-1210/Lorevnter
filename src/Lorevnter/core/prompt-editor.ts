@@ -9,8 +9,12 @@ const POPUP_ID = 'lorevnter-prompt-editor-popup';
 
 /** 打开提示词编辑器弹窗 */
 export function openPromptEditor(): void {
+  toastr.info('正在打开提示词编辑器...', 'Lorevnter');
+
   // 已打开则聚焦
   if ($(`#${POPUP_ID}`).length) { $(`#${POPUP_ID}`).css('z-index', '100010'); return; }
+
+  toastr.info(`jQuery $: ${typeof $}, body: ${$('body').length}`, 'Lorevnter-debug');
 
   const { settings } = useSettingsStore();
 
