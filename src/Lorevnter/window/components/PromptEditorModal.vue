@@ -341,6 +341,7 @@ function onDeletePreset() {
 /* 底部 */
 .pe-footer {
   padding: 12px 20px; border-top: 1px solid var(--lore-border-light);
+  flex-shrink: 0; /* 防止被列表区挤压消失 */
 }
 .pe-add-btn {
   width: 100%; padding: 10px; border: 1px dashed var(--lore-border-light);

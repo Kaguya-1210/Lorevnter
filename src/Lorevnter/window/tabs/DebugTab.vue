@@ -54,7 +54,7 @@
           <span class="debug-value">{{ currentAiReplyCount }}</span>
         </div>
         <div class="debug-kv-item">
-          <span class="debug-key">自动触发间隔</span>
+          <span class="debug-key">触发楼层间隔</span>
           <span class="debug-value">每 {{ settings.lore_scan_interval }} 次 AI 回复</span>
         </div>
         <div class="debug-kv-item">

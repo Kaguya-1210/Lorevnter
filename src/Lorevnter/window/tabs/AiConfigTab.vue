@@ -23,7 +23,16 @@
             <option value="auto">自动触发</option>
           </select>
         </div>
-        <span class="st-hint">{{ settings.lore_scan_trigger === 'auto' ? '每隔设定的 AI 回复轮数自动运行分析' : '仅在点击「AI 分析」按钮时运行' }}</span>
+        <span class="st-hint">{{ settings.lore_scan_trigger === 'auto' ? '每隔设定的 AI 回复楼层数自动运行分析' : '仅在点击「AI 分析」按钮时运行' }}</span>
+      </div>
+
+      <!-- 自动模式下显示触发楼层 -->
+      <div v-if="settings.lore_scan_trigger === 'auto'" class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">触发楼层</span>
+          <input type="number" v-model.number="settings.lore_scan_interval" class="st-number" min="1" max="99" />
+        </div>
+        <span class="st-hint">每隔 {{ settings.lore_scan_interval }} 次 AI 回复触发一次分析（仅计 AI 回复楼层）</span>
       </div>
 
       <div class="st-row">
