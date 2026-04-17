@@ -9,8 +9,11 @@ import { useContextStore } from './worldbook-context';
 import { useRuntimeStore } from '../state';
 import { getEntryConstraint } from './constraints';
 import * as WorldbookAPI from './worldbook-api';
-import { analyzeOnePass, analyzeTwoPass, getApiSnapshot, type AnalysisEntry, type AnalysisRequest } from './ai-engine';
+import { analyzeOnePass, getApiSnapshot, type AnalysisEntry, type AnalysisRequest } from './ai-engine';
 import { autoBackupIfNeeded } from './backup-manager';
+import { extractContent } from './context-extractor';
+import { getUserPersona } from './persona';
+import { getCachedEntryNames, clearCacheAfterAnalysis } from './scan-cache';
 
 const logger = createLogger('pipeline');
 
@@ -23,6 +26,23 @@ let running = false;
 /** 设置当前聊天 ID（由 index.ts 调用） */
 export function setCurrentChatId(chatId: string): void {
   currentChatId = chatId;
+
+  // 清理过期计数记录，最多保留 50 条
+  const { settings } = useSettingsStore();
+  const keys = Object.keys(settings.lore_ai_reply_counts);
+  const MAX_RETAINED = 50;
+  if (keys.length > MAX_RETAINED) {
+    // 保留当前的 + 最近的（按 key 自然序取后 N 个）
+    const toRemove = keys.filter(k => k !== chatId).slice(0, keys.length - MAX_RETAINED);
+    for (const k of toRemove) {
+      delete settings.lore_ai_reply_counts[k];
+    }
+  }
+}
+
+/** 获取当前聊天 ID */
+export function getCurrentChatId(): string {
+  return currentChatId;
 }
 
 /** 获取当前聊天的 AI 回复计数 */
@@ -45,6 +65,9 @@ export function incrementAndCheckAutoScan(): boolean {
   const count = (settings.lore_ai_reply_counts[currentChatId] ?? 0) + 1;
   settings.lore_ai_reply_counts[currentChatId] = count;
 
+  // 跳过零层（开场白）：首次 AI 回复不计入触发
+  if (settings.lore_skip_greeting && count === 1) return false;
+
   return count % settings.lore_scan_interval === 0;
 }
 
@@ -66,8 +89,15 @@ export async function runUpdatePipeline(): Promise<void> {
   const ctx = useContextStore();
   const { settings } = useSettingsStore();
 
+  // ── 前置校验（running=true 之前，避免锁死） ──
   if (ctx.context.mode === 'idle') {
     toastr.warning('无活跃的世界书，请先打开角色卡', 'Lorevnter');
+    return;
+  }
+
+  const worldbookNames = ctx.getActiveWorldbookNames();
+  if (worldbookNames.length === 0) {
+    toastr.warning('无活跃的世界书', 'Lorevnter');
     return;
   }
 
@@ -77,11 +107,6 @@ export async function runUpdatePipeline(): Promise<void> {
 
   try {
     // Step 1: 收集世界书名称
-    const worldbookNames = ctx.getActiveWorldbookNames();
-    if (worldbookNames.length === 0) {
-      toastr.warning('无活跃的世界书', 'Lorevnter');
-      return;
-    }
     logger.info(`活跃世界书: ${worldbookNames.join(', ')}`);
 
     // Step 1.5: 自动备份（AI 分析前快照）
@@ -134,9 +159,7 @@ export async function runUpdatePipeline(): Promise<void> {
       worldbookMap,
     };
 
-    const result = settings.lore_ai_mode === 'twopass'
-      ? await analyzeTwoPass(request)
-      : await analyzeOnePass(request);
+    const result = await analyzeOnePass(request);
 
     // Step 5: 应用更新
     let appliedCount = 0;
@@ -172,6 +195,9 @@ export async function runUpdatePipeline(): Promise<void> {
 
     // 记录到 AI 调用历史（无论是否有更新都记录）
     recordAiCall(request, result, appliedCount);
+
+    // 分析完成后清理缓存（若设置为 after_analysis）
+    clearCacheAfterAnalysis();
   } catch (e) {
     logger.error(`管线失败: ${(e as Error).message}`);
     toastr.error(`更新失败: ${(e as Error).message}`, 'Lorevnter');
@@ -182,19 +208,28 @@ export async function runUpdatePipeline(): Promise<void> {
 
 // ── 辅助函数 ──
 
-/** 获取最近 N 条聊天消息 */
+/** 获取最近 N 条聊天消息（集成正文提取规则） */
 function getRecentChatMessages(maxCount: number): string[] {
   try {
+    const { settings } = useSettingsStore();
     const chat = SillyTavern.chat;
     if (!chat || chat.length === 0) return [];
+
+    const includeTag = settings.lore_context_include_tag;
+    const excludeTags = settings.lore_context_exclude_tags;
 
     const recent = chat.slice(-maxCount);
     return recent
       .filter((msg: any) => msg.mes && typeof msg.mes === 'string')
       .map((msg: any) => {
         const role = msg.is_user ? '{{user}}' : '{{char}}';
-        return `${role}: ${msg.mes}`;
-      });
+        // 应用正文提取规则
+        const content = (includeTag || excludeTags)
+          ? extractContent(msg.mes, includeTag, excludeTags)
+          : msg.mes;
+        return `${role}: ${content}`;
+      })
+      .filter(msg => msg.trim().length > 5); // 过滤掉提取后为空的消息
   } catch (e) {
     logger.error(`获取聊天消息失败: ${(e as Error).message}`);
     return [];
@@ -225,13 +260,14 @@ function recordAiCall(
 
     runtime.aiCallHistory.push({
       timestamp: Date.now(),
-      mode: settings.lore_ai_mode,
+      mode: 'onepass',
       inputEntries: request.entries.length,
       inputMessages: request.chatMessages.length,
       outputUpdates: result.updates.length,
       appliedCount,
       updates: result.updates,
-      // 调试模式下采集 API 配置快照
+      // 调试模式下采集原始响应和 API 配置快照
+      rawResponse: settings.lore_debug_mode ? result.rawResponse : undefined,
       apiDetails: settings.lore_debug_mode ? getApiSnapshot() : undefined,
     });
   } catch {

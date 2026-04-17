@@ -24,9 +24,19 @@ export function getActive(): {
   character: { primary: string | null; additional: string[] };
   chat: string | null;
 } {
-  const global = getGlobalWorldbookNames();
-  const character = getCharWorldbookNames('current');
-  const chat = getChatWorldbookName('current');
+  let global: string[] = [];
+  let character: { primary: string | null; additional: string[] } = { primary: null, additional: [] };
+  let chat: string | null = null;
+
+  try { global = getGlobalWorldbookNames(); } catch (e) {
+    logger.debug('获取全局世界书失败（可能无全局世界书）: ' + (e as Error).message);
+  }
+  try { character = getCharWorldbookNames('current'); } catch (e) {
+    logger.debug('获取角色世界书失败（可能无角色卡）: ' + (e as Error).message);
+  }
+  try { chat = getChatWorldbookName('current'); } catch (e) {
+    logger.debug('获取聊天世界书失败（可能无活跃聊天）: ' + (e as Error).message);
+  }
 
   logger.debug('当前激活世界书', { global, character, chat });
 

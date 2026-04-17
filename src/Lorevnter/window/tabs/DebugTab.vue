@@ -48,18 +48,36 @@
         <span class="debug-section-title">⚡ 快速信息</span>
       </div>
       <div v-if="showQuickInfo" class="debug-section-body">
-        <!-- 当前楼层计数 -->
+        <!-- 上下文快照 -->
         <div class="debug-kv-item">
-          <span class="debug-key">当前聊天 AI 回复计数</span>
-          <span class="debug-value">{{ currentAiReplyCount }}</span>
+          <span class="debug-key">聊天 ID</span>
+          <span class="debug-value debug-mono">{{ currentChatId || '(无)' }}</span>
         </div>
         <div class="debug-kv-item">
-          <span class="debug-key">触发楼层间隔</span>
-          <span class="debug-value">每 {{ settings.lore_scan_interval }} 次 AI 回复</span>
+          <span class="debug-key">世界书来源</span>
+          <span class="debug-value">{{ ctx.context.sourceLabel }}</span>
         </div>
+        <div class="debug-kv-item">
+          <span class="debug-key">分析模式</span>
+          <span class="debug-value">一次调用</span>
+        </div>
+
+        <!-- 触发配置 -->
         <div class="debug-kv-item">
           <span class="debug-key">触发模式</span>
-          <span class="debug-value">{{ settings.lore_scan_trigger === 'auto' ? '自动' : '手动' }}</span>
+          <span class="debug-value">{{ settings.lore_scan_trigger === 'auto' ? '🟢 自动' : '🔵 手动' }}</span>
+        </div>
+        <div v-if="settings.lore_scan_trigger === 'auto'" class="debug-kv-item">
+          <span class="debug-key">当前计数 / 触发间隔</span>
+          <span class="debug-value">{{ currentAiReplyCount }} / {{ settings.lore_scan_interval }}</span>
+        </div>
+        <div v-if="settings.lore_scan_trigger === 'auto'" class="debug-kv-item">
+          <span class="debug-key">距下次触发</span>
+          <span class="debug-value">{{ remainingToTrigger }} 次 AI 回复</span>
+        </div>
+        <div v-if="settings.lore_scan_trigger === 'auto'" class="debug-kv-item">
+          <span class="debug-key">跳过零层</span>
+          <span class="debug-value">{{ settings.lore_skip_greeting ? '✓ 开启' : '✕ 关闭' }}</span>
         </div>
 
         <!-- 一键获取 API 配置 -->
@@ -118,7 +136,7 @@
           </div>
           <div class="debug-kv-item">
             <span class="debug-key">分析模式</span>
-            <span class="debug-value">{{ settings.lore_ai_mode === 'twopass' ? '两次调用' : '一次调用' }}</span>
+            <span class="debug-value">一次调用</span>
           </div>
           <div class="debug-kv-item">
             <span class="debug-key">触发方式</span>
@@ -158,9 +176,17 @@
           </div>
           <div v-if="call.updates.length > 0" class="debug-ai-call-updates">
             <div v-for="(u, j) in call.updates" :key="j" class="debug-ai-update-item">
-              <span class="debug-ai-update-name">{{ u.entryName }}</span>
-              <span class="debug-ai-update-reason">{{ u.reason }}</span>
+              <div class="debug-ai-update-header">
+                <span class="debug-ai-update-name">{{ u.entryName }}</span>
+                <span class="debug-ai-update-reason">{{ u.reason }}</span>
+              </div>
+              <pre class="debug-ai-update-content">{{ u.newContent }}</pre>
             </div>
+          </div>
+          <!-- AI 原始响应 -->
+          <div v-if="call.rawResponse" class="debug-ai-raw">
+            <button class="debug-action-btn" @click="toggleRawResponse(i)" style="font-size:12px;">{{ expandedRaw[i] ? '▼ 收起原始响应' : '▶ 查看原始响应' }}</button>
+            <pre v-if="expandedRaw[i]" class="debug-prompt-content" style="max-height:200px;overflow-y:auto;margin-top:6px;">{{ call.rawResponse }}</pre>
           </div>
           <!-- API 配置快照（调试模式下采集） -->
           <div v-if="call.apiDetails" class="debug-ai-api-details">
@@ -267,6 +293,111 @@
         </div>
       </div>
     </div>
+
+    <!-- 测试模式 -->
+    <div class="debug-section">
+      <div class="debug-section-header" @click="showTestMode = !showTestMode">
+        <span class="debug-section-icon">{{ showTestMode ? '▼' : '▶' }}</span>
+        <span class="debug-section-title">🧪 测试模式</span>
+      </div>
+      <div v-if="showTestMode" class="debug-section-body">
+        <div class="debug-kv-item">
+          <span class="debug-key">说明</span>
+          <span class="debug-value">写入假数据到世界书（不走 AI），测试修改/新增/回档是否正常</span>
+        </div>
+
+        <!-- 活跃快照横幅 -->
+        <div v-if="testSnapshotInfo" class="test-mode-banner">
+          <div class="test-banner-text">
+            📸 快照活跃 — {{ testSnapshotInfo.worldbook }}<br/>
+            修改 {{ testSnapshotInfo.modifiedCount }} 条 | 新增 {{ testSnapshotInfo.createdCount }} 条
+          </div>
+          <div class="test-banner-actions">
+            <button class="st-btn st-btn-danger" :disabled="testBusy" @click="onRollback">
+              {{ testBusy ? '⏳' : '↩️ 回档' }}
+            </button>
+            <button class="st-btn" :disabled="testBusy" @click="onDiscardSnapshot">
+              🗑️ 丢弃快照
+            </button>
+          </div>
+        </div>
+
+        <!-- 目标世界书选择 -->
+        <div class="st-row" v-if="!testSnapshotInfo">
+          <div class="st-row-main">
+            <span class="st-label">目标世界书</span>
+            <button class="debug-action-btn" @click="refreshTestWorldbooks" title="刷新列表">🔄</button>
+          </div>
+          <select v-model="testTargetWorldbook" class="st-select st-select-full">
+            <option value="" disabled>请选择世界书</option>
+            <option v-for="wb in testWorldbookList" :key="wb" :value="wb">{{ wb }}</option>
+          </select>
+        </div>
+        <div class="st-row" v-if="!testSnapshotInfo">
+          <button class="st-btn st-btn-test" :disabled="testBusy || !testTargetWorldbook" @click="onTestWrite">
+            {{ testBusy ? '⏳ 写入中...' : '🧪 执行测试写入' }}
+          </button>
+        </div>
+
+        <!-- 操作结果详情 -->
+        <div v-if="testActions.length > 0" class="test-results">
+          <div class="debug-key" style="margin-bottom:6px">操作结果:</div>
+          <div
+            v-for="(act, i) in testActions"
+            :key="i"
+            class="test-result-item"
+            :class="act.success ? 'test-ok' : 'test-fail'"
+          >
+            <span class="test-result-icon">{{ act.success ? '✓' : '✕' }}</span>
+            <span class="test-result-action">{{ act.action === 'modify' ? '修改' : '新增' }}</span>
+            <span class="test-result-name">{{ act.entryName }}</span>
+            <span class="test-result-uid">uid: {{ act.uid }}</span>
+            <span class="test-result-detail">{{ act.detail }}</span>
+          </div>
+        </div>
+
+        <!-- 触发审核弹窗（模拟 AI 返回结果） -->
+        <div class="st-row" style="margin-top:8px;border-top:1px solid var(--lore-border);padding-top:8px">
+          <button class="st-btn st-btn-test" @click="onTriggerReview">
+            📋 触发审核弹窗
+          </button>
+          <span class="st-hint">使用假数据模拟 AI 返回结果，测试审核流程</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 缓存状态 -->
+    <div class="debug-section">
+      <div class="debug-section-header" @click="showCacheInfo = !showCacheInfo">
+        <span class="debug-section-icon">{{ showCacheInfo ? '▼' : '▶' }}</span>
+        <span class="debug-section-title">📦 条目缓存</span>
+        <button class="debug-action-btn" @click.stop="onRefreshCache" title="刷新缓存信息">🔄</button>
+      </div>
+      <div v-if="showCacheInfo" class="debug-section-body">
+        <div class="debug-kv-item">
+          <span class="debug-key">当前 Chat ID</span>
+          <span class="debug-value debug-mono">{{ cacheStats.chatId || '—' }}</span>
+        </div>
+        <div class="debug-kv-item">
+          <span class="debug-key">当前缓存条目数</span>
+          <span class="debug-value">{{ cacheStats.currentCount }}</span>
+        </div>
+        <div class="debug-kv-item">
+          <span class="debug-key">总缓存聊天数</span>
+          <span class="debug-value">{{ cacheStats.totalChats }}</span>
+        </div>
+        <div class="debug-kv-item">
+          <span class="debug-key">清空模式</span>
+          <span class="debug-value">{{ settings.lore_cache_clear_mode === 'after_analysis' ? '分析后自动' : '手动' }}</span>
+        </div>
+        <div v-if="cachedNames.length > 0" class="debug-cache-names">
+          <div class="debug-key" style="margin-bottom:4px">缓存条目清单:</div>
+          <div v-for="name in cachedNames" :key="name" class="debug-cache-name-item">
+            {{ name }}
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -275,10 +406,14 @@ import { useRuntimeStore } from '../../state';
 import { useSettingsStore } from '../../settings';
 import { useContextStore } from '../../core/worldbook-context';
 import { clearLogBuffer } from '../../logger';
-import { buildAnalysisRequest, getAiReplyCount } from '../../core/update-pipeline';
-import { buildOnePassPrompts, buildTwoPassPrompts, testApiConnection, getApiSnapshot } from '../../core/ai-engine';
+import { buildAnalysisRequest, getAiReplyCount, getCurrentChatId } from '../../core/update-pipeline';
+import { buildOnePassPrompts, testApiConnection, getApiSnapshot } from '../../core/ai-engine';
 import { useSelfCheckStore } from '../../stores/selfCheckStore';
 import * as WorldbookAPI from '../../core/worldbook-api';
+import { runTestWrite, rollbackTestWrite, discardTestSnapshot, getTestSnapshotInfo, getAvailableWorldbooks, type TestActionResult } from '../../core/test-mode';
+import { getCacheStats, getCachedEntryNames } from '../../core/scan-cache';
+import { openReviewEditor } from '../../core/review-editor';
+import type { ReviewUpdate } from '../../core/review-types';
 
 const runtime = useRuntimeStore();
 const { settings } = useSettingsStore();
@@ -292,10 +427,138 @@ const showContext = ref(false);
 const showAiHistory = ref(false);
 const showPromptPreview = ref(false);
 const showLogs = ref(false);
+const showTestMode = ref(false);
+const showCacheInfo = ref(false);
+
+// ── 测试模式 ──
+const testTargetWorldbook = ref('');
+const testBusy = ref(false);
+const testActions = ref<TestActionResult[]>([]);
+const testSnapshotInfo = ref(getTestSnapshotInfo());
+const testWorldbookList = ref<string[]>(getAvailableWorldbooks());
+
+function refreshTestWorldbooks() {
+  testWorldbookList.value = getAvailableWorldbooks();
+  toastr.info(`已刷新：${testWorldbookList.value.length} 个世界书`, 'Lorevnter');
+}
+
+async function onTestWrite() {
+  if (!testTargetWorldbook.value) return;
+  testBusy.value = true;
+  testActions.value = [];
+  try {
+    const result = await runTestWrite(testTargetWorldbook.value);
+    testActions.value = result.actions;
+    testSnapshotInfo.value = getTestSnapshotInfo();
+    if (result.success) {
+      toastr.success(result.message, 'Lorevnter');
+    } else {
+      toastr.error(result.message, 'Lorevnter');
+    }
+  } finally {
+    testBusy.value = false;
+  }
+}
+
+async function onRollback() {
+  if (!confirm('确认回档？将恢复世界书为测试前的状态。')) return;
+  testBusy.value = true;
+  try {
+    const result = await rollbackTestWrite();
+    testSnapshotInfo.value = getTestSnapshotInfo();
+    testActions.value = [];
+    if (result.success) {
+      toastr.success(result.message, 'Lorevnter');
+    } else {
+      toastr.error(result.message, 'Lorevnter');
+    }
+  } finally {
+    testBusy.value = false;
+  }
+}
+
+function onDiscardSnapshot() {
+  if (!confirm('确认丢弃快照？测试写入的数据将保留在世界书中。')) return;
+  discardTestSnapshot();
+  testSnapshotInfo.value = null;
+  testActions.value = [];
+  toastr.info('快照已丢弃，测试数据已保留', 'Lorevnter');
+}
+
+// ── 审核弹窗 ──
+
+/** 触发审核弹窗（使用假数据模拟 AI 返回结果） */
+function onTriggerReview() {
+  const mockUpdates: ReviewUpdate[] = [
+    {
+      entryName: '艾莉丝·创世录',
+      originalContent: '艾莉丝是王国的公主\n她拥有金色的长发',
+      newContent: '艾莉丝是王国的公主\n她拥有金色的长发\n最近与红龙建立了契约',
+      reason: '新增剧情发展：契约事件',
+      approved: null,
+      action: 'update',
+      uid: 101,
+      worldbook: '测试世界书',
+    },
+    {
+      entryName: '红龙·创世录',
+      originalContent: '红龙是古老的守护者\n它沉睡在火山深处',
+      newContent: '红龙是古老的守护者\n它沉睡在火山深处\n现已被艾莉丝唤醒，与其缔结契约',
+      reason: '状态变更：从沉睡变为觉醒',
+      approved: null,
+      action: 'update',
+      uid: 102,
+      worldbook: '测试世界书',
+    },
+    {
+      entryName: '契约魔法',
+      originalContent: '',
+      newContent: '契约魔法是一种古老的束缚术\n缔结双方必须在满月之夜进行仪式\n契约建立后双方可以感知彼此的情绪',
+      reason: '新增世界观设定',
+      approved: null,
+      action: 'create',
+      uid: -1,
+      worldbook: '测试世界书',
+    },
+  ];
+
+  openReviewEditor(mockUpdates, (approved) => {
+    const updateCount = approved.filter(u => u.action === 'update').length;
+    const createCount = approved.filter(u => u.action === 'create').length;
+    toastr.success(
+      `审核完成！将执行 ${updateCount} 条修改、${createCount} 条新增\n（测试模式，实际不写入）`,
+      'Lorevnter',
+      { timeOut: 5000 },
+    );
+  });
+}
+
+// ── 缓存信息 ──
+const cacheStats = ref(getCacheStats());
+const cachedNames = ref<string[]>(getCachedEntryNames());
+
+function onRefreshCache() {
+  cacheStats.value = getCacheStats();
+  cachedNames.value = getCachedEntryNames();
+  toastr.info('缓存信息已刷新', 'Lorevnter');
+}
 
 // ── 快速信息 ──
 const apiSnapshot = ref<ReturnType<typeof getApiSnapshot> | null>(null);
+const currentChatId = computed(() => getCurrentChatId());
 const currentAiReplyCount = computed(() => getAiReplyCount());
+const remainingToTrigger = computed(() => {
+  const count = currentAiReplyCount.value;
+  const interval = settings.lore_scan_interval;
+  if (interval <= 0) return 0;
+  return interval - (count % interval);
+});
+
+// ── AI 原始响应展开 ──
+const expandedRaw = ref<Record<number, boolean>>({});
+function toggleRawResponse(index: number) {
+  expandedRaw.value[index] = !expandedRaw.value[index];
+}
 
 function onFetchApiSnapshot() {
   apiSnapshot.value = getApiSnapshot();
@@ -342,13 +605,8 @@ async function onBuildPreview() {
       return;
     }
 
-    if (settings.lore_ai_mode === 'twopass') {
-      const { triage, update } = buildTwoPassPrompts(request);
-      previewPrompts.value = { mode: 'twopass', triage, update };
-    } else {
-      const prompts = buildOnePassPrompts(request);
-      previewPrompts.value = { mode: 'onepass', onepass: prompts };
-    }
+    const prompts = buildOnePassPrompts(request);
+    previewPrompts.value = { mode: 'onepass', onepass: prompts };
 
     toastr.success('提示词预览已生成', 'Lorevnter');
   } catch (e) {
@@ -373,12 +631,14 @@ function onRefreshLogs() {
 }
 
 function onClearLogs() {
+  if (!confirm('确定清空所有日志？')) return;
   clearLogBuffer();
   runtime.refreshLogs();
   toastr.info('日志已清空', 'Lorevnter');
 }
 
 function onClearAiHistory() {
+  if (!confirm('确定清空所有 AI 调用历史？')) return;
   runtime.clearAiHistory();
   toastr.info('AI 历史已清空', 'Lorevnter');
 }
@@ -389,7 +649,6 @@ function onExportDebug() {
     aiHistory: runtime.aiCallHistory,
     logs: runtime.logEntries,
     settings: {
-      ai_mode: settings.lore_ai_mode,
       scan_trigger: settings.lore_scan_trigger,
       scan_interval: settings.lore_scan_interval,
       constraints_count: settings.lore_constraints.length,
@@ -502,10 +761,20 @@ function startDiagnostics() {
 .debug-ai-call-result.has-updates { background: var(--lore-success-bg); color: var(--lore-success); }
 .debug-ai-call-updates { margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--lore-border-light); }
 .debug-ai-update-item {
-  display: flex; gap: 8px; font-size: 12px; padding: 3px 0;
+  display: flex; flex-direction: column; gap: 4px; font-size: 12px; padding: 6px 0;
+  border-bottom: 1px dashed var(--lore-border-light);
 }
+.debug-ai-update-item:last-child { border-bottom: none; }
+.debug-ai-update-header { display: flex; gap: 8px; align-items: center; }
 .debug-ai-update-name { color: var(--lore-accent); font-weight: 500; }
 .debug-ai-update-reason { color: var(--lore-text-secondary); }
+.debug-ai-update-content {
+  font-size: 12px; font-family: monospace; color: var(--lore-text-primary);
+  background: var(--lore-bg-primary); border: 1px solid var(--lore-border-light);
+  border-radius: var(--lore-radius-sm); padding: 8px 10px;
+  white-space: pre-wrap; word-break: break-word; margin: 0;
+  max-height: 120px; overflow-y: auto;
+}
 .debug-ai-api-details {
   margin-top: 6px; padding: 8px 10px;
   background: var(--lore-bg-primary); border-radius: var(--lore-radius-sm);
@@ -631,5 +900,96 @@ function startDiagnostics() {
 .debug-action-btn-full:hover {
   background: var(--lore-accent); color: #fff;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* 测试模式 banner */
+.test-mode-banner {
+  background: rgba(255, 165, 0, 0.12);
+  border: 1px solid rgba(255, 165, 0, 0.35);
+  border-radius: var(--lore-radius-sm);
+  padding: 12px 14px;
+  margin: 8px 0;
+}
+.test-banner-text {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+  color: var(--lore-text);
+}
+.test-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+.st-btn-danger {
+  background: rgba(255, 59, 48, 0.15) !important;
+  color: #ff3b30 !important;
+  border-color: rgba(255, 59, 48, 0.3) !important;
+}
+.st-btn-danger:hover {
+  background: #ff3b30 !important;
+  color: #fff !important;
+}
+
+/* 缓存条目列表 */
+.debug-cache-names {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--lore-surface-2, rgba(255,255,255,0.04));
+  border-radius: var(--lore-radius-sm);
+}
+.debug-cache-name-item {
+  padding: 3px 0;
+  font-size: 12px;
+  font-family: var(--lore-font-mono, monospace);
+  color: var(--lore-text-secondary);
+  border-bottom: 1px solid var(--lore-border);
+}
+.debug-cache-name-item:last-child {
+  border-bottom: none;
+}
+
+/* 测试结果列表 */
+.test-results {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--lore-surface-2, rgba(255,255,255,0.04));
+  border-radius: var(--lore-radius-sm);
+}
+.test-result-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: 1px solid var(--lore-border);
+}
+.test-result-item:last-child { border-bottom: none; }
+.test-result-icon { width: 16px; text-align: center; font-weight: 600; }
+.test-ok .test-result-icon { color: #34c759; }
+.test-fail .test-result-icon { color: #ff3b30; }
+.test-result-action {
+  font-weight: 500;
+  min-width: 28px;
+  color: var(--lore-text);
+}
+.test-result-name {
+  flex: 1;
+  color: var(--lore-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.test-result-uid {
+  font-family: var(--lore-font-mono, monospace);
+  color: var(--lore-text-tertiary, #666);
+  font-size: 11px;
+}
+.test-result-detail {
+  color: var(--lore-text-secondary);
+  font-size: 11px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

@@ -32,7 +32,8 @@ const PromptPresetSchema = z.object({
   name: z.string(),
   description: z.string().default(''),
   createdAt: z.string(),
-  items: z.array(PromptItemSchema),
+  update_items: z.array(PromptItemSchema).default([]),
+  triage_items: z.array(PromptItemSchema).default([]),
 });
 export type PromptPreset = z.infer<typeof PromptPresetSchema>;
 
@@ -43,7 +44,6 @@ const PresetDataSchema = z.object({
   lore_scan_interval: z.number().default(1),
   lore_constraints: z.array(LoreConstraintSchema).default([]),
   // AI 行为配置（不包含敏感的 API 密钥和地址）
-  lore_ai_mode: z.enum(['onepass', 'twopass']).default('onepass'),
   lore_ai_system_prompt: z.string().default(''),
   lore_ai_max_context: z.number().default(10),
   lore_scan_trigger: z.enum(['auto', 'manual']).default('manual'),
@@ -77,17 +77,39 @@ const LorevnterSettings = z
     /** 约束列表 */
     lore_constraints: z.array(LoreConstraintSchema).default([]),
 
-    // ── AI 配置（不纳入预设） ──
-    /** AI 分析模式 */
-    lore_ai_mode: z.enum(['onepass', 'twopass']).default('onepass'),
+    // ── AI 配置 ──
     /** AI 系统提示词模板（旧字段，兼容回退） */
     lore_ai_system_prompt: z.string().default(''),
-    /** AI 提示词列表（新，优先使用） */
-    lore_ai_prompt_list: z.array(PromptItemSchema).default([]),
+    /** 当前激活的提示词预设名（default = 内置） */
+    lore_active_prompt_preset: z.string().default('default'),
     /** AI 最大上下文消息数 */
     lore_ai_max_context: z.number().default(10),
     /** 触发模式 */
     lore_scan_trigger: z.enum(['auto', 'manual']).default('manual'),
+    /** 跳过零层（开场白）：首次 AI 回复不计入自动触发 */
+    lore_skip_greeting: z.boolean().default(true),
+
+    // ── 正文提取规则 ──
+    /** 包含标签：只提取该标签内的内容。空 = 全文 */
+    lore_context_include_tag: z.string().default(''),
+    /** 排除标签：逗号分隔。* = 排除所有标签内容 */
+    lore_context_exclude_tags: z.string().default(''),
+
+    // ── 审核配置 ──
+    /** 是否启用修改审核弹窗 */
+    lore_review_enabled: z.boolean().default(true),
+    /** 是否支持只执行已审核的条目 */
+    lore_review_partial_execute: z.boolean().default(true),
+
+    // ── 用户人设 ──
+    /** 是否在 AI 提示词中附加用户人设 */
+    lore_include_persona: z.boolean().default(false),
+
+    // ── 新增条目 ──
+    /** 新增条目的起始 order（0=自动: max+10） */
+    lore_new_entry_start_order: z.number().default(0),
+    /** 新增条目默认写入的世界书名 */
+    lore_new_entry_default_worldbook: z.string().default(''),
 
     // ── AI 采样参数 ──
     /** 温度（创造性）。same_as_preset = 跟随酒馆预设 */
@@ -101,7 +123,7 @@ const LorevnterSettings = z
     /** 存在惩罚 */
     lore_ai_presence_penalty: z.union([z.literal('same_as_preset'), z.number()]).default('same_as_preset'),
 
-    // ── AI API 连接配置（不纳入预设） ──
+    // ── AI API 连接配置（全局） ──
     /** API 格式（当前仅 OpenAI 兼容） */
     lore_api_format: z.enum(['openai']).default('openai'),
     /** API 来源: tavern=复用酒馆连接, custom=自定义端点 */
@@ -110,8 +132,23 @@ const LorevnterSettings = z
     lore_api_base_url: z.string().default(''),
     /** 自定义 API Key（仅 source=custom 时生效） */
     lore_api_key: z.string().default(''),
-    /** 模型名称（两种模式共用，tavern 模式下覆盖酒馆默认模型） */
+    /** 模型名称（tavern 模式下覆盖酒馆默认模型） */
     lore_api_model: z.string().default(''),
+
+    // ── 阶段独立 API 配置（折叠式，默认使用全局） ──
+    lore_phase_triage_use_global: z.boolean().default(true),
+    lore_phase_triage_api_source: z.enum(['tavern', 'custom']).default('tavern'),
+    lore_phase_triage_api_url: z.string().default(''),
+    lore_phase_triage_api_key: z.string().default(''),
+    lore_phase_triage_model: z.string().default(''),
+    lore_phase_triage_temperature: z.union([z.literal('same_as_preset'), z.number()]).default('same_as_preset'),
+
+    lore_phase_update_use_global: z.boolean().default(true),
+    lore_phase_update_api_source: z.enum(['tavern', 'custom']).default('tavern'),
+    lore_phase_update_api_url: z.string().default(''),
+    lore_phase_update_api_key: z.string().default(''),
+    lore_phase_update_model: z.string().default(''),
+    lore_phase_update_temperature: z.union([z.literal('same_as_preset'), z.number()]).default('same_as_preset'),
 
     // ── 预设列表 ──
     lore_presets: z.array(PresetSchema).default([]),
@@ -129,6 +166,19 @@ const LorevnterSettings = z
     lore_backup_interval: z.number().default(1),
     /** 最大备份保留数 */
     lore_backup_max_count: z.number().default(5),
+
+    // ── SCAN_DONE 缓存（持久化） ──
+    /** key=chatId, value=条目名列表 */
+    lore_scan_cache: z.record(z.string(), z.array(z.string())).default({}),
+    /** key=chatId, value=最后更新时间戳 */
+    lore_scan_cache_timestamps: z.record(z.string(), z.number()).default({}),
+    /** 缓存清空模式: after_analysis=分析完清空, manual=手动 */
+    lore_cache_clear_mode: z.enum(['after_analysis', 'manual']).default('after_analysis'),
+    /** 手动模式下的缓存上限（0=无上限） */
+    lore_cache_max_size: z.number().default(0),
+
+    // ── 测试模式（调试 Tab，写入假数据不走 API） ──
+    lore_test_mode: z.boolean().default(false),
   })
   .prefault({});
 
@@ -140,7 +190,6 @@ function extractPresetData(settings: LorevnterSettingsType): PresetData {
     lore_target_worldbooks: settings.lore_target_worldbooks,
     lore_scan_interval: settings.lore_scan_interval,
     lore_constraints: settings.lore_constraints,
-    lore_ai_mode: settings.lore_ai_mode,
     lore_ai_system_prompt: settings.lore_ai_system_prompt,
     lore_ai_max_context: settings.lore_ai_max_context,
     lore_scan_trigger: settings.lore_scan_trigger,
@@ -155,7 +204,6 @@ function applyPresetData(settings: LorevnterSettingsType, data: PresetData): voi
   settings.lore_target_worldbooks = data.lore_target_worldbooks;
   settings.lore_scan_interval = data.lore_scan_interval;
   settings.lore_constraints = data.lore_constraints;
-  settings.lore_ai_mode = data.lore_ai_mode;
   settings.lore_ai_system_prompt = data.lore_ai_system_prompt;
   settings.lore_ai_max_context = data.lore_ai_max_context;
   settings.lore_scan_trigger = data.lore_scan_trigger;

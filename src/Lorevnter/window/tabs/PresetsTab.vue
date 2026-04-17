@@ -23,7 +23,6 @@
           <span class="preset-data-tag">世界书: {{ preset.data.lore_target_worldbooks.length }} 个</span>
           <span class="preset-data-tag">约束: {{ preset.data.lore_constraints?.length ?? 0 }}</span>
           <span class="preset-data-tag">间隔: {{ preset.data.lore_scan_interval }}</span>
-          <span class="preset-data-tag">{{ preset.data.lore_ai_mode === 'twopass' ? '两次调用' : '一次调用' }}</span>
           <span v-if="preset.data.lore_api_model" class="preset-data-tag">模型: {{ preset.data.lore_api_model }}</span>
         </div>
         <div class="preset-card-actions">

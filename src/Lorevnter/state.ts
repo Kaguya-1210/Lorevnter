@@ -14,6 +14,8 @@ export interface AiCallRecord {
   outputUpdates: number;
   appliedCount: number;
   updates: Array<{ entryName: string; newContent: string; reason: string }>;
+  /** AI 原始响应文本（调试用） */
+  rawResponse?: string;
   /** 调试模式下采集的 API 配置快照 */
   apiDetails?: {
     source: 'tavern' | 'custom';

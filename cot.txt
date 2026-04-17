@@ -1,0 +1,119 @@
+<rules>
+
+# ═══════════════════════════════════════════════════
+# Lorevnter 项目开发约束
+# ═══════════════════════════════════════════════════
+
+## 1. 项目架构认知
+
+本项目是 SillyTavern 酒馆助手的「脚本」插件。
+- 脚本以**无沙盒 iframe** 的形式在酒馆后台运行，自身没有独立页面。
+- jQuery 通过 `window.$ = window.parent.$` 获得，因此 `$('body')` 选中的是**酒馆主页面**的 body，而非 iframe 自己的。
+- Vue App 通过 `createScriptIdDiv().appendTo('body')` 挂载到酒馆主页面上（jQuery 选择器作用域决定的）。
+- 样式通过 `teleportStyle()` 从 iframe 内部复制到酒馆主页面的 `<head>` 中。
+- 因此：Vue 组件中的 `<style scoped>` 能正常工作，但 `<Teleport to="body">` 等 Vue 内建 teleport 行为不可靠——它会 teleport 到 iframe 的 body 而非酒馆主页面。
+
+## 2. 弹窗/悬浮层编写规范（高优先级）
+
+**任何脱离 Vue 组件树的弹窗/遮罩/悬浮层，必须遵循 `prompt-editor.ts` 的模式：**
+
+```typescript
+// ✅ 正确做法
+function getTopDoc(): Document {
+  return (typeof window.parent !== 'undefined' ? window.parent : window).document;
+}
+
+const doc = getTopDoc();
+const overlay = doc.createElement('div');
+overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:100000;...';
+const popup = doc.createElement('div');
+popup.style.cssText = 'position:fixed;z-index:100001;...';
+doc.body.appendChild(overlay);
+doc.body.appendChild(popup);
+```
+
+需要注意的关键点：
+- **z-index 必须 ≥ 100000**。酒馆自身 UI 会占用较低的 z-index 层级，低于此值的弹窗会被遮挡。
+- **overlay 和 popup 分离为两个元素**，各自独立 `appendChild` 到 `doc.body`。不要把 popup 嵌套在 overlay 内部。
+- **使用酒馆 CSS 变量**来匹配主题色：
+  - `--SmartThemeBlurTintColor` → 背景色（fallback: `#1e1e2e`）
+  - `--SmartThemeBorderColor` → 边框色（fallback: `#333`）
+  - `--SmartThemeBodyColor` → 文字色（fallback: `#ccc`）
+- **不要使用 `inset: 0` 的写法**，改用 `top:0;left:0;width:100vw;height:100vh` 明确声明。
+- 弹窗内不要使用 `--lore-*` 自定义变量——这些只在 Vue 组件的 scoped 样式中可用，弹窗挂载在主文档中访问不到。
+
+❌ 禁止做法：
+- `<Teleport to="body">` — teleport 到的是 iframe 的 body
+- `document.body.appendChild(...)` — 直接用 `document` 挂载到 iframe 的 body
+- z-index < 100000 的弹窗
+
+## 3. 酒馆助手 API 使用规范
+
+**优先使用 `@types/function/` 中定义的酒馆助手高层接口，而非 `SillyTavern.*` 底层接口。**
+
+| ✅ 正确 | ❌ 错误 |
+|---------|---------|
+| `getChatMessages(-1)` + `.message` | `SillyTavern.chat[i].mes` |
+| `getVariables({type:'script', script_id: getScriptId()})` | `localStorage.getItem(...)` |
+| `getWorldbook(name)` | 自行 fetch 酒馆 API |
+| `replaceVariables(data, ...)` | 直接操作酒馆内部变量 |
+
+所有 `@types/function/` 和 `@types/iframe/` 中的接口无需 import，直接调用即可。
+
+## 4. UI 设计规范：iOS 风格
+
+本项目的 UI 统一遵循 Apple iOS 设计语言，具体要求：
+
+- **圆角**：卡片 14px、按钮/输入框 10px、小标签 8px（使用 `--lore-radius-*` 变量）
+- **配色**：暗色主题优先，使用 `lorevnter.scss` 中定义的 `--lore-*` 设计 Token
+  - 主色调 `--lore-accent: #0A84FF`（iOS Blue）
+  - 成功 `--lore-success: #30D158 / #34C759`
+  - 危险 `--lore-danger: #FF453A / #FF3B30`
+- **间距**：内边距 14-18px，元素间距 8-12px
+- **动效**：统一使用 cubic-bezier(0.32, 0.72, 0, 1) 或 ease-out，时长 0.2-0.35s
+- **分隔线**：使用 `1px solid var(--lore-border)` 而非粗线或 margin 分隔
+- **Grabber**：底部 Sheet 弹窗顶部需要 Grabber 条（36px × 5px 圆角灰条）
+
+## 5. 移动端适配（必须）
+
+本插件会在手机端浏览器上使用，因此：
+- 弹窗宽度使用 `width: min(90vw, 520px)` 或 `min(100vw, 560px)` 适配小屏
+- 添加 `@media(max-width: 600px)` 响应式断点：
+  - 弹窗全屏化：`width:100vw;max-height:100vh;border-radius:0`
+  - 隐藏次要信息（如 `.lpe-preview { display: none }`）
+  - 缩小内边距
+- 按钮/交互区域最小 36px × 36px（触摸友好）
+- 避免 hover-only 的交互（手机没有 hover）
+
+## 6. 高敏感操作保护
+
+所有可能产生不可逆后果的操作（删除、重置、覆盖、写入世界书等）：
+- 必须增加明确的**二次确认步骤**（`confirm()` 或自定义确认弹窗）
+- 确认文案清晰说明操作后果，提供「取消」与「确认执行」的显式选择
+- 关键操作完成后给予明确的成功/失败反馈（toastr 通知）
+- 绝对不能替用户自动执行——必须让用户明确同意
+
+## 7. 代码风格
+
+- 使用 TypeScript，不用 JavaScript
+- 使用 jQuery 操作酒馆主页面 DOM（`$` 直接作用于主页面）
+- Vue 组件优先使用 `<script setup lang="ts">` + Pinia
+- 数据校验使用 Zod Schema
+- 持久化使用酒馆脚本变量：`getVariables/replaceVariables({type:'script', script_id: getScriptId()})`
+- 日志使用 `createLogger('module-name')` 创建模块级 logger
+
+## 8. 架构影响评估
+
+在进行任何功能修改前，先分析当前代码架构与模块依赖关系：
+- 明确本次修改可能波及的功能范围，列出受影响的插件、UI 组件及交互模块
+- 评估修改对现有功能、全局状态（Pinia stores）、事件通信及数据流的兼容性风险
+- 新增或修改界面元素时，沿用当前插件的视觉语言与交互模式（iOS 风格）
+
+## 9. 样式注意事项
+
+- **Vue 组件内**：使用 `<style scoped lang="scss">`，可以使用 `--lore-*` 变量
+- **原生 DOM 弹窗**：使用酒馆 `--SmartTheme*` 变量（因为挂在主页面上）
+- **禁止使用 TailwindCSS class 直接操作主页面元素**（rules/脚本.mdc 明确禁止，会与酒馆网页类名冲突）
+- 样式注入到主页面用 `(doc.head || doc.documentElement).appendChild(styleElement)`
+
+</rules>
