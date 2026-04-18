@@ -241,7 +241,7 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
                   position: {
                     order: settings.lore_new_entry_start_order || 100,
                   },
-                  recursion: { prevent_incoming: true },
+                  recursion: { prevent_outgoing: true },
                 }]);
                 appliedCount++;
                 logger.info(`已新增: ${update.entryName} → ${targetWb}`);
@@ -292,7 +292,7 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
                 position: {
                   order: settings.lore_new_entry_start_order || 100,
                 },
-                recursion: { prevent_incoming: true },
+                recursion: { prevent_outgoing: true },
               }]);
               appliedCount++;
               logger.info(`已新增: ${update.entryName} → ${createWb}`);

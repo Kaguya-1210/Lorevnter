@@ -182,7 +182,7 @@ export async function runTestWrite(worldbookName: string): Promise<{
                   keys: [update.entryName, 'lorevnter_test'],
                 },
                 position: { order: 9999 },
-                recursion: { prevent_incoming: true },
+                recursion: { prevent_outgoing: true },
               }]);
               for (const ne of result.new_entries) {
                 actions.push({
