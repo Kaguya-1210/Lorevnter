@@ -171,8 +171,9 @@ function onSelectChange() {
 }
 
 async function onAiAnalyze() {
-  await runUpdatePipeline();
-  if (selectedName.value) {
+  const result = await runUpdatePipeline();
+  // 只在直接写入完成后刷新列表，审核模式下不刷新（审核后的写入由回调处理）
+  if (result === 'applied' && selectedName.value) {
     try {
       entries.value = await WorldbookAPI.fetch(selectedName.value);
     } catch (e) { logger.warn(`AI 分析后刷新条目失败: ${(e as Error).message}`); }

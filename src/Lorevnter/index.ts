@@ -165,10 +165,10 @@ $(() => {
     if (chatChangeCooldown) return;
 
     // 判断最后一条消息是否来自 AI
-    const chat = SillyTavern.chat;
-    if (!chat || chat.length === 0) return;
-    const lastMsg = chat[chat.length - 1];
-    if (lastMsg?.is_user) return; // 用户消息不计数
+    const msgs = getChatMessages(-1);
+    if (!msgs || msgs.length === 0) return;
+    const lastMsg = msgs[0];
+    if (lastMsg.role === 'user') return; // 用户消息不计数
 
     if (incrementAndCheckAutoScan()) {
       logger.info('自动触发 AI 分析（AI 回复计数达到间隔）');

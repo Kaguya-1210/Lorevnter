@@ -19,30 +19,31 @@ const logger = createLogger('context-extractor');
 export function extractContent(raw: string, includeTag: string, excludeTags: string): string {
   let text = raw;
 
-  // Step 1: include —— 只取指定标签内的内容
+  // Step 1: include —— 只取指定标签内的内容（支持带属性的标签）
   if (includeTag.trim()) {
     const tag = includeTag.trim();
-    const regex = new RegExp(`<${escapeRegex(tag)}>([\\s\\S]*?)</${escapeRegex(tag)}>`, 'gi');
+    // 匹配 <tag> 或 <tag attr="val"> 格式
+    const regex = new RegExp(`<${escapeRegex(tag)}(?:\\s[^>]*)?>([\\s\\S]*?)</${escapeRegex(tag)}>`, 'gi');
     const matches = [...text.matchAll(regex)].map(m => m[1]);
     if (matches.length > 0) {
       text = matches.join('\n');
     } else {
       // 标签未匹配到内容，返回空（避免误用全文）
-      logger.debug(`包含标签 <${tag}> 未在文本中找到`);
+      logger.warn(`包含标签 <${tag}> 未在文本中找到，返回空文本`);
       text = '';
     }
   }
 
-  // Step 2: exclude —— 去掉指定标签的内容
+  // Step 2: exclude —— 去掉指定标签的内容（支持带属性的标签）
   const trimmedExclude = excludeTags.trim();
   if (trimmedExclude && text) {
     if (trimmedExclude === '*') {
-      // 排除所有标签包裹的内容（贪婪匹配同名开闭标签）
-      text = text.replace(/<([a-zA-Z_][\w-]*)>[\s\S]*?<\/\1>/g, '');
+      // 排除所有标签包裹的内容
+      text = text.replace(/<([a-zA-Z_][\w-]*)(?:\s[^>]*)?>[\s\S]*?<\/\1>/g, '');
     } else {
       const tags = trimmedExclude.split(',').map(t => t.trim()).filter(Boolean);
       for (const tag of tags) {
-        const regex = new RegExp(`<${escapeRegex(tag)}>[\\s\\S]*?</${escapeRegex(tag)}>`, 'gi');
+        const regex = new RegExp(`<${escapeRegex(tag)}(?:\\s[^>]*)?>([\\s\\S]*?)</${escapeRegex(tag)}>`, 'gi');
         text = text.replace(regex, '');
       }
     }

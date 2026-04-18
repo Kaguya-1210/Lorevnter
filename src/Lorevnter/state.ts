@@ -31,6 +31,9 @@ export interface AiCallRecord {
 
 export type TabName = 'worldbooks' | 'constraints' | 'ai' | 'presets' | 'settings' | 'logs';
 
+/** 管线状态 */
+export type PipelineStatus = 'disabled' | 'idle' | 'running' | 'pending_review' | 'done' | 'failed';
+
 export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
   // ── 窗口状态 ──
   const windowVisible = ref(false);
@@ -46,6 +49,11 @@ export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
 
   // ── AI 调用历史 ──
   const aiCallHistory = ref<AiCallRecord[]>([]);
+
+  // ── 管线状态 ──
+  const pipelineStatus = ref<PipelineStatus>('idle');
+  /** 最近一次管线结果摘要 */
+  const pipelineLastMessage = ref('');
 
   /** 从 logger 缓冲区刷新日志到响应式状态 */
   function refreshLogs() {
@@ -63,6 +71,8 @@ export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
     worldbookSelectedName,
     logEntries,
     aiCallHistory,
+    pipelineStatus,
+    pipelineLastMessage,
     refreshLogs,
     clearAiHistory,
   };

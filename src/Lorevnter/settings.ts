@@ -135,21 +135,6 @@ const LorevnterSettings = z
     /** 模型名称（tavern 模式下覆盖酒馆默认模型） */
     lore_api_model: z.string().default(''),
 
-    // ── 阶段独立 API 配置（折叠式，默认使用全局） ──
-    lore_phase_triage_use_global: z.boolean().default(true),
-    lore_phase_triage_api_source: z.enum(['tavern', 'custom']).default('tavern'),
-    lore_phase_triage_api_url: z.string().default(''),
-    lore_phase_triage_api_key: z.string().default(''),
-    lore_phase_triage_model: z.string().default(''),
-    lore_phase_triage_temperature: z.union([z.literal('same_as_preset'), z.number()]).default('same_as_preset'),
-
-    lore_phase_update_use_global: z.boolean().default(true),
-    lore_phase_update_api_source: z.enum(['tavern', 'custom']).default('tavern'),
-    lore_phase_update_api_url: z.string().default(''),
-    lore_phase_update_api_key: z.string().default(''),
-    lore_phase_update_model: z.string().default(''),
-    lore_phase_update_temperature: z.union([z.literal('same_as_preset'), z.number()]).default('same_as_preset'),
-
     // ── 预设列表 ──
     lore_presets: z.array(PresetSchema).default([]),
     /** 提示词预设（独立于全局预设） */

@@ -35,12 +35,13 @@ function loadBackups(): BackupRecord[] {
   }
 }
 
-function saveBackups(backups: BackupRecord[]): void {
+function saveBackups(backups: BackupRecord[]): boolean {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(backups));
+    return true;
   } catch (e) {
     logger.error(`保存备份失败: ${(e as Error).message}`);
-    // localStorage 满了时静默忽略
+    return false;
   }
 }
 
@@ -107,7 +108,10 @@ export async function createBackup(
     }
     trimmed.sort((a, b) => b.timestamp - a.timestamp);
 
-    saveBackups(trimmed);
+    const saved = saveBackups(trimmed);
+    if (!saved) {
+      toastr.warning('备份已创建但持久化失败（存储空间可能不足）', 'Lorevnter');
+    }
     logger.info(`备份已创建: ${worldbookName} (${record.entryCount} 条)`);
     return record;
   } catch (e) {
@@ -164,24 +168,43 @@ export function exportBackups(backupIds?: string[]): string {
 /** 导入备份 */
 export function importBackups(jsonStr: string): number {
   try {
-    const imported = JSON.parse(jsonStr) as BackupRecord[];
-    if (!Array.isArray(imported)) throw new Error('格式错误');
+    const imported = JSON.parse(jsonStr);
+    if (!Array.isArray(imported)) throw new Error('格式错误：应为数组');
 
     const backups = loadBackups();
     const existingIds = new Set(backups.map(b => b.id));
     let added = 0;
+    let skipped = 0;
     for (const record of imported) {
-      if (!record.id || !record.worldbookName || !record.entries) continue;
+      // 结构校验
+      if (
+        !record || typeof record !== 'object' ||
+        typeof record.id !== 'string' ||
+        typeof record.worldbookName !== 'string' ||
+        !Array.isArray(record.entries) ||
+        typeof record.timestamp !== 'number' ||
+        typeof record.entryCount !== 'number'
+      ) {
+        skipped++;
+        continue;
+      }
       if (existingIds.has(record.id)) continue;
-      backups.push(record);
+      backups.push(record as BackupRecord);
       added++;
     }
     backups.sort((a, b) => b.timestamp - a.timestamp);
-    saveBackups(backups);
+    const saved = saveBackups(backups);
+    if (!saved) {
+      toastr.warning('导入成功但持久化失败', 'Lorevnter');
+    }
+    if (skipped > 0) {
+      logger.warn(`导入时跳过 ${skipped} 条格式不合规的记录`);
+    }
     logger.info(`已导入 ${added} 条备份`);
     return added;
   } catch (e) {
     logger.error(`导入备份失败: ${(e as Error).message}`);
+    toastr.error(`导入失败: ${(e as Error).message}`, 'Lorevnter');
     return 0;
   }
 }

@@ -14,8 +14,13 @@ import { autoBackupIfNeeded } from './backup-manager';
 import { extractContent } from './context-extractor';
 import { getUserPersona } from './persona';
 import { getCachedEntryNames, clearCacheAfterAnalysis } from './scan-cache';
+import { openReviewEditor } from './review-editor';
+import type { ReviewUpdate } from './review-types';
 
 const logger = createLogger('pipeline');
+
+/** 管线执行结果 */
+export type PipelineResult = 'applied' | 'pending_review' | 'no_change' | 'failed' | 'skipped';
 
 /** 当前聊天文件名（由 index.ts 在 CHAT_CHANGED 时设置） */
 let currentChatId = '';
@@ -78,21 +83,41 @@ export function resetMessageCount(): void {
 }
 
 /**
- * 运行完整的更新管线
+ * 判断已有条目的变更类型：追加 or 修改
+ * - 新内容以原文开头 → append（追加）
+ * - 否则 → modify（修改）
  */
-export async function runUpdatePipeline(): Promise<void> {
+function classifyAction(originalContent: string, newContent: string): 'append' | 'modify' {
+  const trimOrig = originalContent.trim();
+  const trimNew = newContent.trim();
+  if (!trimOrig) return 'append'; // 原文为空视为追加
+  if (trimNew.startsWith(trimOrig)) return 'append';
+  return 'modify';
+}
+
+/**
+ * 运行完整的更新管线
+ * @returns 管线执行结果态
+ */
+export async function runUpdatePipeline(): Promise<PipelineResult> {
   if (running) {
     toastr.warning('分析正在进行中，请等待完成', 'Lorevnter');
-    return;
+    return 'skipped';
   }
 
   const ctx = useContextStore();
   const { settings } = useSettingsStore();
 
+  // ── 总开关检查 ──
+  if (!settings.lore_plugin_enabled) {
+    logger.info('插件已禁用，跳过管线');
+    return 'skipped';
+  }
+
   // ── 前置校验（running=true 之前，避免锁死） ──
   if (ctx.context.mode === 'idle') {
     toastr.warning('无活跃的世界书，请先打开角色卡', 'Lorevnter');
-    return;
+    return 'failed';
   }
 
   const worldbookNames = ctx.getActiveWorldbookNames();
@@ -102,6 +127,9 @@ export async function runUpdatePipeline(): Promise<void> {
   }
 
   running = true;
+  const runtime = useRuntimeStore();
+  runtime.pipelineStatus = 'running';
+  runtime.pipelineLastMessage = '';
   toastr.info('开始分析剧情变化...', 'Lorevnter');
   logger.info('管线启动');
 
@@ -139,7 +167,7 @@ export async function runUpdatePipeline(): Promise<void> {
 
     if (analysisEntries.length === 0) {
       toastr.info('没有需要分析的条目（全部被跳过或无条目）', 'Lorevnter');
-      return;
+      return 'no_change';
     }
 
     logger.info(`待分析: ${analysisEntries.length} 条目 (共 ${allEntries.length} 条, ${allEntries.length - analysisEntries.length} 跳过)`);
@@ -148,7 +176,16 @@ export async function runUpdatePipeline(): Promise<void> {
     const chatMessages = getRecentChatMessages(settings.lore_ai_max_context);
     if (chatMessages.length === 0) {
       toastr.warning('聊天记录为空，无法分析', 'Lorevnter');
-      return;
+      return 'failed';
+    }
+
+    // Step 3.5: 用户 persona 注入
+    if (settings.lore_include_persona) {
+      const persona = getUserPersona();
+      if (persona) {
+        chatMessages.unshift(`[用户人设信息] ${persona}`);
+        logger.debug('已注入用户 persona');
+      }
     }
 
     // Step 4: 调用 AI
@@ -161,46 +198,140 @@ export async function runUpdatePipeline(): Promise<void> {
 
     const result = await analyzeOnePass(request);
 
-    // Step 5: 应用更新
-    let appliedCount = 0;
-
+    // Step 5: 应用更新（根据审核开关分流）
     if (result.updates.length > 0) {
-      for (const update of result.updates) {
-        // 找到条目所属的世界书
-        const targetWb = findWorldbookForEntry(update.entryName, worldbookMap);
-        if (!targetWb) {
-          logger.warn(`找不到条目 "${update.entryName}" 所属的世界书，跳过`);
-          continue;
-        }
+      // 确定新增条目的目标世界书
+      const defaultCreateWb = settings.lore_new_entry_default_worldbook || worldbookNames[0] || '';
 
-        try {
-          await updateWorldbookWith(targetWb.worldbookName, (entries) =>
-            entries.map((e) =>
-              e.name === update.entryName ? { ...e, content: update.newContent } : e,
-            ),
-          );
-          appliedCount++;
-          logger.info(`已更新: ${update.entryName} (${update.reason})`);
-        } catch (e) {
-          logger.error(`写入失败: ${update.entryName} — ${(e as Error).message}`);
+      if (settings.lore_review_enabled) {
+        // 审核模式：构造 ReviewUpdate 并打开审核弹窗
+        const reviewUpdates: ReviewUpdate[] = result.updates.map(u => {
+          const found = findWorldbookForEntry(u.entryName, worldbookMap);
+          const originalContent = found?.entry.content ?? '';
+          return {
+            entryName: u.entryName,
+            originalContent,
+            newContent: u.newContent,
+            reason: u.reason,
+            approved: null,
+            action: found ? classifyAction(originalContent, u.newContent) : 'create' as const,
+            uid: found?.entry.uid ?? -1,
+            worldbook: found?.worldbookName ?? defaultCreateWb,
+          };
+        });
+
+        // 记录 AI 调用历史（审核前）
+        recordAiCall(request, result, 0);
+
+        // 打开审核弹窗，用户确认后执行写入
+        openReviewEditor(reviewUpdates, async (approved) => {
+          let appliedCount = 0;
+          for (const update of approved) {
+            try {
+              if (update.action === 'create') {
+                // 新增条目
+                const targetWb = update.worldbook || defaultCreateWb;
+                await WorldbookAPI.createEntries(targetWb, [{
+                  name: update.entryName,
+                  content: update.newContent,
+                  strategy: {
+                    type: 'selective',
+                    keys: [update.entryName],
+                  },
+                  position: {
+                    order: settings.lore_new_entry_start_order || 100,
+                  },
+                  recursion: { prevent_incoming: true },
+                }]);
+                appliedCount++;
+                logger.info(`已新增: ${update.entryName} → ${targetWb}`);
+              } else {
+                // 更新已有条目（append 或 modify 均为写入新内容）
+                const targetWb = findWorldbookForEntry(update.entryName, worldbookMap);
+                if (!targetWb) continue;
+                await updateWorldbookWith(targetWb.worldbookName, (entries) =>
+                  entries.map((e) =>
+                    e.name === update.entryName ? { ...e, content: update.newContent } : e,
+                  ),
+                );
+                appliedCount++;
+                logger.info(`已更新: ${update.entryName}`);
+              }
+            } catch (e) {
+              logger.error(`写入失败: ${update.entryName} — ${(e as Error).message}`);
+            }
+          }
+          toastr.success(`审核完成，已写入 ${appliedCount} 条`, 'Lorevnter');
+          clearCacheAfterAnalysis();
+        });
+
+        logger.info(`管线完成: ${result.updates.length} 条待审核`);
+        runtime.pipelineStatus = 'pending_review';
+        runtime.pipelineLastMessage = `${result.updates.length} 条待审核`;
+        return 'pending_review';
+      } else {
+        // 直接写入模式
+        let appliedCount = 0;
+        for (const update of result.updates) {
+          const targetWb = findWorldbookForEntry(update.entryName, worldbookMap);
+          try {
+            if (!targetWb) {
+              // 新增条目
+              const createWb = defaultCreateWb;
+              if (!createWb) {
+                logger.warn(`找不到条目 "${update.entryName}" 且无默认世界书，跳过`);
+                continue;
+              }
+              await WorldbookAPI.createEntries(createWb, [{
+                name: update.entryName,
+                content: update.newContent,
+                strategy: {
+                  type: 'selective',
+                  keys: [update.entryName],
+                },
+                position: {
+                  order: settings.lore_new_entry_start_order || 100,
+                },
+                recursion: { prevent_incoming: true },
+              }]);
+              appliedCount++;
+              logger.info(`已新增: ${update.entryName} → ${createWb}`);
+            } else {
+              // 更新已有条目
+              await updateWorldbookWith(targetWb.worldbookName, (entries) =>
+                entries.map((e) =>
+                  e.name === update.entryName ? { ...e, content: update.newContent } : e,
+                ),
+              );
+              appliedCount++;
+              logger.info(`已更新: ${update.entryName} (${update.reason})`);
+            }
+          } catch (e) {
+            logger.error(`写入失败: ${update.entryName} — ${(e as Error).message}`);
+          }
         }
+        const names = result.updates.map((u) => u.entryName).join(', ');
+        toastr.success(`已写入 ${appliedCount} 条: ${names}`, 'Lorevnter');
+        logger.info(`管线完成: ${appliedCount}/${result.updates.length} 条已应用`);
+        recordAiCall(request, result, appliedCount);
+        clearCacheAfterAnalysis();
+        runtime.pipelineStatus = 'done';
+        runtime.pipelineLastMessage = `已写入 ${appliedCount} 条`;
+        return 'applied';
       }
-
-      const names = result.updates.map((u) => u.entryName).join(', ');
-      toastr.success(`已更新 ${appliedCount} 条: ${names}`, 'Lorevnter');
-      logger.info(`管线完成: ${appliedCount}/${result.updates.length} 条已应用`);
     } else {
       logger.info('管线完成: 无需更新');
+      recordAiCall(request, result, 0);
+      runtime.pipelineStatus = 'idle';
+      runtime.pipelineLastMessage = '无需更新';
+      return 'no_change';
     }
-
-    // 记录到 AI 调用历史（无论是否有更新都记录）
-    recordAiCall(request, result, appliedCount);
-
-    // 分析完成后清理缓存（若设置为 after_analysis）
-    clearCacheAfterAnalysis();
   } catch (e) {
     logger.error(`管线失败: ${(e as Error).message}`);
     toastr.error(`更新失败: ${(e as Error).message}`, 'Lorevnter');
+    runtime.pipelineStatus = 'failed';
+    runtime.pipelineLastMessage = (e as Error).message;
+    return 'failed';
   } finally {
     running = false;
   }
@@ -212,24 +343,23 @@ export async function runUpdatePipeline(): Promise<void> {
 function getRecentChatMessages(maxCount: number): string[] {
   try {
     const { settings } = useSettingsStore();
-    const chat = SillyTavern.chat;
-    if (!chat || chat.length === 0) return [];
+    const msgs = getChatMessages(maxCount);
+    if (!msgs || msgs.length === 0) return [];
 
     const includeTag = settings.lore_context_include_tag;
     const excludeTags = settings.lore_context_exclude_tags;
 
-    const recent = chat.slice(-maxCount);
+    const recent = msgs.slice(-maxCount);
     return recent
-      .filter((msg: any) => msg.mes && typeof msg.mes === 'string')
-      .map((msg: any) => {
-        const role = msg.is_user ? '{{user}}' : '{{char}}';
-        // 应用正文提取规则
+      .filter((msg) => msg.message && typeof msg.message === 'string')
+      .map((msg) => {
+        const role = msg.role === 'user' ? '{{user}}' : '{{char}}';
         const content = (includeTag || excludeTags)
-          ? extractContent(msg.mes, includeTag, excludeTags)
-          : msg.mes;
+          ? extractContent(msg.message, includeTag, excludeTags)
+          : msg.message;
         return `${role}: ${content}`;
       })
-      .filter(msg => msg.trim().length > 5); // 过滤掉提取后为空的消息
+      .filter(msg => msg.trim().length > 5);
   } catch (e) {
     logger.error(`获取聊天消息失败: ${(e as Error).message}`);
     return [];

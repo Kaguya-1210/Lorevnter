@@ -6,6 +6,7 @@
 import { createLogger } from '../logger';
 import { useSettingsStore } from '../settings';
 import * as WorldbookAPI from './worldbook-api';
+import { getCurrentChatId as getCurrentPipelineChatId } from './update-pipeline';
 
 const logger = createLogger('context');
 
@@ -62,7 +63,7 @@ export const useContextStore = defineStore('lorevnter_context', () => {
     try {
       const active = WorldbookAPI.getActive();
       const charName = getCurrentCharacterName();
-      const chatId = null; // 脚本模式下无直接 API
+      const chatId = getCurrentPipelineChatId() || null;
 
       const ctx = context.value;
       ctx.character = active.character;

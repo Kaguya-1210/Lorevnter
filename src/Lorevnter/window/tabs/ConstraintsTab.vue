@@ -14,7 +14,6 @@
           <div class="ct-card-header">
             <span class="ct-card-icon">{{ c.type === 'skip' ? '🚫' : '🏷' }}</span>
             <span class="ct-card-name">{{ c.name }}</span>
-            <span class="ct-card-refs">{{ getRefCount(c.id) }} 条引用</span>
           </div>
           <div v-if="c.type === 'prompt' && c.instruction" class="ct-card-preview">
             {{ c.instruction.slice(0, 60) }}{{ c.instruction.length > 60 ? '…' : '' }}

@@ -12,6 +12,17 @@
         <span class="lorevnter-subtitle">世界书管理</span>
       </div>
 
+      <!-- 全局管线状态条 -->
+      <div v-if="settings.lore_plugin_enabled" class="lorevnter-status-bar" :class="'status-' + runtime.pipelineStatus">
+        <span class="status-dot"></span>
+        <span class="status-text">{{ statusLabel }}</span>
+        <span v-if="runtime.pipelineLastMessage" class="status-msg">{{ runtime.pipelineLastMessage }}</span>
+      </div>
+      <div v-else class="lorevnter-status-bar status-disabled">
+        <span class="status-dot"></span>
+        <span class="status-text">AI 分析已关闭</span>
+      </div>
+
       <ContextBar />
 
       <div class="lorevnter-tabs-container">
@@ -27,6 +38,7 @@
             @click="runtime.currentTab = 'logs'"
           >调试</button>
         </div>
+        <div class="lorevnter-tabs-fade"></div>
       </div>
 
       <div class="lorevnter-body">
@@ -55,6 +67,18 @@ import DebugTab from './tabs/DebugTab.vue';
 
 const { settings } = useSettingsStore();
 const runtime = useRuntimeStore();
+
+const statusLabel = computed(() => {
+  const map: Record<string, string> = {
+    disabled: 'AI 分析已关闭',
+    idle: '就绪',
+    running: '分析中...',
+    pending_review: '待审核',
+    done: '已完成',
+    failed: '失败',
+  };
+  return map[runtime.pipelineStatus] || '就绪';
+});
 
 // 开启调试模式 → 自动切到调试页；关闭 → 若在调试页则切回设置
 watch(() => settings.lore_debug_mode, (on) => {
@@ -126,6 +150,38 @@ watch(() => settings.lore_debug_mode, (on) => {
 /* 分段控制器 Tabs (Segmented Control, 可滚动) */
 .lorevnter-tabs-container {
   padding: 10px 16px;
+  position: relative;
+}
+.lorevnter-tabs-fade {
+  position: absolute; right: 16px; top: 10px; bottom: 0;
+  width: 28px;
+  background: linear-gradient(to right, transparent, var(--lore-glass-bg, rgba(30,30,46,0.95)));
+  pointer-events: none;
+  border-radius: 0 var(--lore-radius-sm) var(--lore-radius-sm) 0;
+}
+
+/* 全局管线状态条 */
+.lorevnter-status-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 20px; font-size: 12px; font-weight: 500;
+  color: var(--lore-text-secondary);
+}
+.status-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.status-text { flex-shrink: 0; }
+.status-msg { color: var(--lore-text-tertiary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.status-idle .status-dot { background: #34c759; }
+.status-running .status-dot { background: #ff9f0a; animation: status-pulse 1.2s infinite; }
+.status-pending_review .status-dot { background: #0a84ff; animation: status-pulse 1.5s infinite; }
+.status-done .status-dot { background: #34c759; }
+.status-failed .status-dot { background: #ff3b30; }
+.status-disabled .status-dot { background: #636366; }
+
+@keyframes status-pulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
 .lorevnter-tabs {
   display: flex; padding: 2px;

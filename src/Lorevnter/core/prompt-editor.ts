@@ -61,43 +61,6 @@ export const BUILTIN_UPDATE_PRESET: PromptItem[] = [
   },
 ];
 
-/** 筛选阶段（twopass 第1次调用） */
-export const BUILTIN_TRIAGE_PRESET: PromptItem[] = [
-  {
-    id: 'builtin_triage_sys',
-    role: 'system',
-    name: '[筛选] 系统指令',
-    enabled: true,
-    content: `<role>你是 Lorevnter 世界书条目筛选器。你不参与对话，你是一个过滤管线。</role>
-
-<task>从条目名称列表中筛选出可能需要更新的条目。</task>
-
-<analysis_steps>
-1. 逐一检查每个条目名称
-2. 对比对话内容，判断是否有信息可能影响该条目记录的状态
-3. 有关联 → 选入；不确定 → 也选入（宁多勿漏）
-4. 无关 → 不选
-</analysis_steps>
-
-<rules>
-<rule id="T1" priority="critical">对话中直接提及或暗示了该条目记录的状态发生变化 → 选入。</rule>
-<rule id="T2" priority="high">不确定时宁可多选。后续更新阶段会精确判断。</rule>
-<rule id="T3" priority="critical">纯 JSON 数组输出：只输出条目名称数组。</rule>
-</rules>
-
-<output_schema>
-["条目名称1", "条目名称2"]
-无需检查时返回：[]
-</output_schema>`,
-  },
-  {
-    id: 'builtin_triage_ast',
-    role: 'assistant',
-    name: '[筛选] CoT 锚定',
-    enabled: true,
-    content: `[`,
-  },
-];
 
 /** 构造 default 虚拟预设对象 */
 function makeDefaultPreset(): PromptPreset {
@@ -106,7 +69,7 @@ function makeDefaultPreset(): PromptPreset {
     description: '内置默认预设',
     createdAt: '',
     update_items: JSON.parse(JSON.stringify(BUILTIN_UPDATE_PRESET)),
-    triage_items: JSON.parse(JSON.stringify(BUILTIN_TRIAGE_PRESET)),
+    triage_items: [],
   };
 }
 
@@ -154,18 +117,14 @@ export function openPromptEditor(): void {
 
   // 工作副本（从激活预设加载）
   let workUpdate: PromptItem[] = [];
-  let workTriage: PromptItem[] = [];
-  let activeTab: 'update' | 'triage' = 'update';
 
   // 脏检查快照（用于关闭时判断是否有未保存修改）
   let snapshotUpdate = '';
-  let snapshotTriage = '';
   function takeSnapshot() {
     snapshotUpdate = JSON.stringify(workUpdate);
-    snapshotTriage = JSON.stringify(workTriage);
   }
   function isDirty(): boolean {
-    return JSON.stringify(workUpdate) !== snapshotUpdate || JSON.stringify(workTriage) !== snapshotTriage;
+    return JSON.stringify(workUpdate) !== snapshotUpdate;
   }
 
   function loadPreset(name: string) {
@@ -174,16 +133,13 @@ export function openPromptEditor(): void {
 
     if (name === 'default') {
       workUpdate = JSON.parse(JSON.stringify(BUILTIN_UPDATE_PRESET));
-      workTriage = JSON.parse(JSON.stringify(BUILTIN_TRIAGE_PRESET));
     } else {
       const found = settings.lore_prompt_presets.find(p => p.name === name);
       if (found) {
         workUpdate = JSON.parse(JSON.stringify(found.update_items));
-        workTriage = JSON.parse(JSON.stringify(found.triage_items));
       } else {
         // 找不到 → 回退 default
         workUpdate = JSON.parse(JSON.stringify(BUILTIN_UPDATE_PRESET));
-        workTriage = JSON.parse(JSON.stringify(BUILTIN_TRIAGE_PRESET));
         currentPresetName = 'default';
         settings.lore_active_prompt_preset = 'default';
       }
@@ -226,18 +182,10 @@ export function openPromptEditor(): void {
   doc.body.appendChild(overlay);
   doc.body.appendChild(popup);
 
-  // Tab 切换
-  popup.querySelectorAll('.lpe-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      activeTab = (btn as HTMLElement).dataset.tab as 'update' | 'triage';
-      popup.querySelectorAll('.lpe-tab').forEach(b => b.classList.remove('lpe-tab-active'));
-      btn.classList.add('lpe-tab-active');
-      render();
-    });
-  });
+  // Tab 切换（当前只有 update）
 
   function getActiveList(): PromptItem[] {
-    return activeTab === 'triage' ? workTriage : workUpdate;
+    return workUpdate;
   }
 
   // ── 预设下拉（选即加载） ──
@@ -337,7 +285,7 @@ export function openPromptEditor(): void {
           description: '',
           createdAt: new Date().toISOString(),
           update_items: JSON.parse(JSON.stringify(workUpdate)),
-          triage_items: JSON.parse(JSON.stringify(workTriage)),
+          triage_items: [],
         };
         const idx = settings.lore_prompt_presets.findIndex(p => p.name === name);
         if (idx >= 0) {
@@ -393,7 +341,7 @@ export function openPromptEditor(): void {
         description: '',
         createdAt: new Date().toISOString(),
         update_items: JSON.parse(JSON.stringify(workUpdate)),
-        triage_items: JSON.parse(JSON.stringify(workTriage)),
+        triage_items: [],
       };
       const idx = settings.lore_prompt_presets.findIndex(p => p.name === name);
       if (idx >= 0) settings.lore_prompt_presets[idx] = newPreset;
@@ -409,7 +357,6 @@ export function openPromptEditor(): void {
       const idx = settings.lore_prompt_presets.findIndex(p => p.name === currentPresetName);
       if (idx >= 0) {
         settings.lore_prompt_presets[idx].update_items = JSON.parse(JSON.stringify(workUpdate));
-        settings.lore_prompt_presets[idx].triage_items = JSON.parse(JSON.stringify(workTriage));
         toastr.success(`预设已保存: ${currentPresetName}`, 'Lorevnter');
       }
       takeSnapshot();
@@ -498,8 +445,8 @@ function injectStyles(doc: Document) {
   const s = doc.createElement('style');
   s.id = 'lpe-css';
   s.textContent = `
-.lpe-bg{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,.5);z-index:100000}
-.lpe-popup,.lpe-edit-dlg{position:fixed;z-index:100001;background:var(--SmartThemeBlurTintColor,#1e1e2e);border:1px solid var(--SmartThemeBorderColor,#333);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4);display:flex;flex-direction:column;overflow:hidden;color:var(--SmartThemeBodyColor,#ccc);animation:lpe-in .2s ease-out}
+.lpe-bg{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,.5);z-index:100010}
+.lpe-popup,.lpe-edit-dlg{position:fixed;z-index:100011;background:var(--SmartThemeBlurTintColor,#1e1e2e);border:1px solid var(--SmartThemeBorderColor,#333);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4);display:flex;flex-direction:column;overflow:hidden;color:var(--SmartThemeBodyColor,#ccc);animation:lpe-in .2s ease-out}
 .lpe-popup{top:50%;left:50%;transform:translate(-50%,-50%);width:min(95vw,560px);max-height:85vh}
 .lpe-edit-dlg{top:50%;left:50%;transform:translate(-50%,-50%);width:min(90vw,480px);max-height:80vh}
 @keyframes lpe-in{from{opacity:0;transform:translate(-50%,-50%) scale(.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}

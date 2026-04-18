@@ -1,11 +1,13 @@
 // ============================================================
 // Lorevnter - 测试模式
-// 调试 Tab 功能：写入假数据到世界书，不走 API
-// 用于测试写入/修改/新增管线是否正常
+// 调试 Tab 功能：写入假数据到世界书，走审核弹窗流程
+// 用于测试审核/写入/修改/新增管线是否正常
 // ============================================================
 
 import { createLogger } from '../logger';
 import * as wbApi from './worldbook-api';
+import { openReviewEditor } from './review-editor';
+import type { ReviewUpdate } from './review-types';
 
 const logger = createLogger('test-mode');
 
@@ -79,8 +81,8 @@ export function getAvailableWorldbooks(): string[] {
 }
 
 /**
- * 执行测试写入：向指定世界书写入假数据。
- * 模拟操作：修改现有条目（uid 级别） + 新增条目
+ * 执行测试写入：向指定世界书构造假数据，通过审核弹窗确认后写入。
+ * 模拟操作：修改现有条目 + 追加内容 + 新增条目
  * 会先保存快照供回档使用。
  */
 export async function runTestWrite(worldbookName: string): Promise<{
@@ -98,8 +100,8 @@ export async function runTestWrite(worldbookName: string): Promise<{
       return { success: false, message: '世界书中没有条目，无法执行修改测试', actions: [] };
     }
 
-    // 保存原始快照
-    const snapshot: TestSnapshot = {
+    // 保存原始快照（审核前就保存，确保可回档）
+    activeSnapshot = {
       worldbookName,
       originalEntries: klona(entries),
       createdCount: 0,
@@ -107,90 +109,140 @@ export async function runTestWrite(worldbookName: string): Promise<{
       timestamp: Date.now(),
     };
 
-    const actions: TestActionResult[] = [];
     const timestamp = new Date().toLocaleString();
 
-    // ── 模拟修改：选取最多 2 个条目，通过 uid 修改 content ──
-    const modifyCount = Math.min(2, entries.length);
-    for (let i = 0; i < modifyCount; i++) {
-      const entry = entries[i];
-      const name = entry.comment || entry.name || `uid_${entry.uid}`;
+    // ── 构造 ReviewUpdate 数组 ──
+    const reviewUpdates: ReviewUpdate[] = [];
 
-      try {
-        await wbApi.updateEntry(worldbookName, entry.uid, {
-          content: entry.content + `\n\n<!-- [Lorevnter 测试] uid:${entry.uid} 修改于 ${timestamp} -->`,
-        });
-
-        actions.push({
-          action: 'modify',
-          entryName: name,
-          uid: entry.uid,
-          success: true,
-          detail: `content 末尾追加测试标记`,
-        });
-        snapshot.modifiedCount++;
-        logger.info(`测试修改成功: ${name} (uid: ${entry.uid})`);
-      } catch (e) {
-        actions.push({
-          action: 'modify',
-          entryName: name,
-          uid: entry.uid,
-          success: false,
-          detail: (e as Error).message,
-        });
-        logger.error(`测试修改失败: ${name} (uid: ${entry.uid}) — ${(e as Error).message}`);
+    // 模拟修改：选取第 1 个条目，在内容中插入几个字（微小变更）
+    if (entries.length >= 1) {
+      const entry = entries[0];
+      const name = entry.name || `uid_${entry.uid}`;
+      const lines = entry.content.split('\n');
+      // 在第一行末尾加几个字
+      if (lines.length > 0) {
+        lines[0] = lines[0] + `（测试修改 ${timestamp}）`;
       }
-    }
-
-    // ── 模拟新增：创建一个测试条目 ──
-    try {
-      const result = await wbApi.createEntries(worldbookName, [{
-        comment: `[Lorevnter 测试] ${timestamp}`,
-        content: `这是 Lorevnter 测试模式自动创建的条目。\n写入时间: ${timestamp}\n\n如果你看到这条，说明新增功能正常！\n请使用「测试回档」功能删除此条目。`,
-        key: ['lorevnter_test'],
-        selective: true,
-        constant: false,
-        disable: false,
-        order: 9999,
-      }]);
-
-      for (const ne of result.new_entries) {
-        actions.push({
-          action: 'create',
-          entryName: ne.comment || '测试条目',
-          uid: ne.uid,
-          success: true,
-          detail: `uid: ${ne.uid}`,
-        });
-      }
-      snapshot.createdCount = result.new_entries.length;
-      logger.info(`测试新增成功: ${result.new_entries.length} 条`);
-    } catch (e) {
-      actions.push({
-        action: 'create',
-        entryName: '测试条目',
-        uid: -1,
-        success: false,
-        detail: (e as Error).message,
+      reviewUpdates.push({
+        entryName: name,
+        originalContent: entry.content,
+        newContent: lines.join('\n'),
+        reason: '测试修改：在首行末尾加了几个字',
+        approved: null,
+        action: 'modify',
+        uid: entry.uid,
+        worldbook: worldbookName,
       });
-      logger.error(`测试新增失败: ${(e as Error).message}`);
     }
 
-    // 保存快照
-    activeSnapshot = snapshot;
+    // 模拟追加：选取第 2 个条目，在内容末尾追加一行
+    if (entries.length >= 2) {
+      const entry = entries[1];
+      const name = entry.name || `uid_${entry.uid}`;
+      reviewUpdates.push({
+        entryName: name,
+        originalContent: entry.content,
+        newContent: entry.content + `\n最近发生了一些变化。（测试追加 ${timestamp}）`,
+        reason: '测试追加：末尾追加了一句话',
+        approved: null,
+        action: 'append',
+        uid: entry.uid,
+        worldbook: worldbookName,
+      });
+    }
 
-    const successCount = actions.filter(a => a.success).length;
-    const failCount = actions.filter(a => !a.success).length;
+    // 模拟新增：创建一个带标题和关键词的测试条目
+    reviewUpdates.push({
+      entryName: `Lorevnter测试条目`,
+      originalContent: '',
+      newContent: `这是 Lorevnter 测试模式创建的条目。\n写入时间：${timestamp}\n\n如果看到这条说明新增功能正常，请使用「测试回档」删除。`,
+      reason: '测试新增：验证条目创建功能',
+      approved: null,
+      action: 'create',
+      uid: -1,
+      worldbook: worldbookName,
+    });
 
-    const msg = failCount === 0
-      ? `测试写入成功！修改 ${snapshot.modifiedCount} 条，新增 ${snapshot.createdCount} 条。`
-      : `测试部分完成：成功 ${successCount}，失败 ${failCount}。`;
+    // ── 通过审核弹窗确认 ──
+    return new Promise((resolve) => {
+      openReviewEditor(reviewUpdates, async (approved) => {
+        const actions: TestActionResult[] = [];
+        let modCount = 0;
+        let crCount = 0;
 
-    logger.info(`测试写入完成: ${msg}`);
-    return { success: failCount === 0, message: msg, actions };
+        for (const update of approved) {
+          try {
+            if (update.action === 'create') {
+              // 新增条目
+              const result = await wbApi.createEntries(worldbookName, [{
+                name: update.entryName,
+                content: update.newContent,
+                strategy: {
+                  type: 'selective',
+                  keys: [update.entryName, 'lorevnter_test'],
+                },
+                position: { order: 9999 },
+                recursion: { prevent_incoming: true },
+              }]);
+              for (const ne of result.new_entries) {
+                actions.push({
+                  action: 'create',
+                  entryName: update.entryName,
+                  uid: ne.uid,
+                  success: true,
+                  detail: `uid: ${ne.uid}`,
+                });
+              }
+              crCount++;
+            } else {
+              // 修改或追加（通过 uid 更新 content）
+              await wbApi.updateEntry(worldbookName, update.uid, {
+                content: update.newContent,
+              });
+              actions.push({
+                action: 'modify',
+                entryName: update.entryName,
+                uid: update.uid,
+                success: true,
+                detail: `content 已更新`,
+              });
+              modCount++;
+            }
+          } catch (e) {
+            actions.push({
+              action: update.action === 'create' ? 'create' : 'modify',
+              entryName: update.entryName,
+              uid: update.uid,
+              success: false,
+              detail: (e as Error).message,
+            });
+          }
+        }
+
+        // 更新快照计数
+        if (activeSnapshot) {
+          activeSnapshot.modifiedCount = modCount;
+          activeSnapshot.createdCount = crCount;
+        }
+
+        const failCount = actions.filter(a => !a.success).length;
+        const msg = failCount === 0
+          ? `测试写入成功！修改 ${modCount} 条，新增 ${crCount} 条。`
+          : `测试部分完成：成功 ${actions.length - failCount}，失败 ${failCount}。`;
+
+        logger.info(`测试写入完成: ${msg}`);
+        resolve({ success: failCount === 0, message: msg, actions });
+      }, () => {
+        // onCancel: 用户点击取消，释放 Promise + 清除快照
+        activeSnapshot = null;
+        logger.info('用户取消测试写入审核');
+        resolve({ success: false, message: '用户取消了审核', actions: [] });
+      });
+    });
   } catch (e) {
     const msg = (e as Error).message;
     logger.error(`测试写入失败: ${msg}`);
+    activeSnapshot = null;
     return { success: false, message: `测试写入失败: ${msg}`, actions: [] };
   }
 }

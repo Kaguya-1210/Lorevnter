@@ -14,8 +14,8 @@ export interface ReviewUpdate {
   reason: string;
   /** 审核状态：null=未决, true=通过, false=拒绝 */
   approved: boolean | null;
-  /** 操作类型 */
-  action: 'update' | 'create';
+  /** 操作类型: create=新条目, append=追加内容, modify=修改内容 */
+  action: 'create' | 'append' | 'modify';
   /** 条目 uid（update 时有值，create 时为 -1） */
   uid: number;
   /** 目标世界书名 */

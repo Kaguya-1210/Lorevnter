@@ -1,6 +1,6 @@
 // ============================================================
 // Lorevnter - AI 分析引擎
-// 封装 generateRaw 调用，支持一次调用和两次调用两种模式
+// 封装 generateRaw 调用，一次调用模式
 // ============================================================
 
 import { createLogger } from '../logger';
@@ -141,10 +141,21 @@ export async function testApiConnection(): Promise<{ ok: boolean; message: strin
         { role: 'user', content: 'Hello, respond with "ok".' } as RolePrompt,
       ],
     });
-    if (result && result.length > 0) {
-      return { ok: true, message: `连接成功 (${result.slice(0, 30)}...)` };
+
+    if (!result || result.trim().length === 0) {
+      return { ok: false, message: '响应为空' };
     }
-    return { ok: false, message: '响应为空' };
+
+    // 检测 API 错误标记（酒馆助手返回错误时通常以 [API Error] 开头）
+    const errorPatterns = ['[API Error]', '[Error]', 'error', '401', '403', '404', '500'];
+    const lower = result.toLowerCase();
+    for (const pattern of errorPatterns) {
+      if (lower.startsWith(pattern.toLowerCase())) {
+        return { ok: false, message: `API 返回错误: ${result.slice(0, 80)}` };
+      }
+    }
+
+    return { ok: true, message: `连接成功 (${result.slice(0, 30).trim()}...)` };
   } catch (e) {
     return { ok: false, message: (e as Error).message };
   }
@@ -196,7 +207,7 @@ function concatPrefill(prefill: string, rawResponse: string): string {
 
 // ── 从激活预设构建提示词 ──
 
-import { getActivePreset, BUILTIN_UPDATE_PRESET, BUILTIN_TRIAGE_PRESET } from './prompt-editor';
+import { getActivePreset, BUILTIN_UPDATE_PRESET } from './prompt-editor';
 
 /**
  * 构建更新阶段的 ordered_prompts。
@@ -213,20 +224,7 @@ function buildUpdatePrompts(allEntries: WorldbookEntry[]): RolePrompt[] {
   } as RolePrompt));
 }
 
-/**
- * 构建筛选阶段的 ordered_prompts。
- * 从当前激活预设的 triage_items 读取，回退到内置。
- */
-function buildTriagePromptMessages(allEntries: WorldbookEntry[]): RolePrompt[] {
-  const preset = getActivePreset();
-  const enabledItems = preset.triage_items.filter(p => p.enabled);
 
-  const source = enabledItems.length > 0 ? enabledItems : BUILTIN_TRIAGE_PRESET.filter(p => p.enabled);
-  return source.map(p => ({
-    role: p.role,
-    content: resolveMacros(p.content, allEntries),
-  } as RolePrompt));
-}
 
 // ── 核心函数 ──
 
@@ -283,101 +281,7 @@ export async function analyzeOnePass(request: AnalysisRequest): Promise<Analysis
   }
 }
 
-/** 两次调用模式：先筛选，再更新 */
-export async function analyzeTwoPass(request: AnalysisRequest): Promise<AnalysisResult> {
-  const { settings } = useSettingsStore();
-  const callApi = buildApiCaller();
-  logger.info(`两次调用模式: ${request.entries.length} 个条目, ${request.chatMessages.length} 条消息`);
 
-  const chatText = request.chatMessages.join('\n---\n');
-
-  // ── 第 1 次：筛选 ──
-  const namesList = request.entries.map((ae) => `- ${ae.entry.name}`).join('\n');
-  const triagePrompt = `以下是所有世界书条目名称：\n${namesList}\n\n请阅读最近的对话内容，判断哪些条目需要更新。\n仅返回需要更新的条目名称列表，JSON 数组格式。\n\n## 最近的对话内容\n${chatText}`;
-
-  toastr.info('AI 正在筛选条目...', 'Lorevnter');
-
-  let markedNames: string[];
-  try {
-    // 筛选阶段：从激活预设读取
-    const triageListMsgs = buildTriagePromptMessages(request.allEntries);
-    const ordered_prompts: RolePrompt[] = [
-      ...triageListMsgs,
-      { role: 'user', content: triagePrompt } as RolePrompt,
-    ];
-
-    const triagePrefill = extractAssistantPrefill(triageListMsgs);
-
-    const triageResponse = await callApi({ ordered_prompts });
-
-    logger.debug('筛选响应', triageResponse);
-    const fullTriageResponse = concatPrefill(triagePrefill, triageResponse);
-    markedNames = parseNameList(fullTriageResponse);
-    logger.info(`筛选完成: ${markedNames.length} 条需检查`);
-    toastr.info(`AI 筛选完成: ${markedNames.length} 条需检查`, 'Lorevnter');
-  } catch (e) {
-    logger.error(`筛选调用失败: ${(e as Error).message}`);
-    toastr.error(`AI 筛选失败: ${(e as Error).message}`, 'Lorevnter');
-    throw e;
-  }
-
-  if (markedNames.length === 0) {
-    toastr.info('AI 判断无需更新', 'Lorevnter');
-    return { updates: [], rawResponse: '[]' };
-  }
-
-  // ── 第 2 次：更新 ──
-  const markedEntries = request.entries.filter((ae) =>
-    markedNames.some((n) => n === ae.entry.name),
-  );
-
-  const entriesText = markedEntries
-    .map((ae) => {
-      const constraintText = ae.constraint
-        ? `\n  约束: ${resolveMacros(ae.constraint.instruction, request.allEntries)}`
-        : '';
-      return `- ${ae.entry.name}:${constraintText}\n  当前内容: ${ae.entry.content}`;
-    })
-    .join('\n\n');
-
-  const updatePrompt = `## 需要更新的条目\n${entriesText}\n\n## 最近的对话内容\n${chatText}`;
-
-  toastr.info('AI 正在生成更新...', 'Lorevnter');
-
-  // 构建消息序列（含内置预设回退）
-  const updatePrompts = buildUpdatePrompts(request.allEntries);
-
-  // 检测 assistant 预填充前缀
-  const prefill2 = extractAssistantPrefill(updatePrompts);
-
-  try {
-    const ordered_prompts: RolePrompt[] = [
-      ...updatePrompts,
-      { role: 'user', content: updatePrompt } as RolePrompt,
-    ];
-
-    const rawResponse = await callApi({
-      ordered_prompts,
-    });
-
-    logger.debug('更新响应', rawResponse);
-    const fullResponse2 = concatPrefill(prefill2, rawResponse);
-    const result = parseAiResponse(fullResponse2);
-    logger.info(`更新分析完成: ${result.updates.length} 条`);
-
-    if (result.updates.length > 0) {
-      toastr.success(`分析完成: ${result.updates.length} 条需更新`, 'Lorevnter');
-    } else {
-      toastr.info('AI 判断无需更新', 'Lorevnter');
-    }
-
-    return result;
-  } catch (e) {
-    logger.error(`更新调用失败: ${(e as Error).message}`);
-    toastr.error(`AI 更新分析失败: ${(e as Error).message}`, 'Lorevnter');
-    throw e;
-  }
-}
 
 // ── 响应解析 ──
 
@@ -427,21 +331,7 @@ function parseAiResponse(raw: string): AnalysisResult {
   return { updates: [], rawResponse: raw };
 }
 
-/** 解析名称列表 JSON */
-function parseNameList(raw: string): string[] {
-  try {
-    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) || raw.match(/(\[[\s\S]*\])/);
-    const jsonStr = jsonMatch ? jsonMatch[1].trim() : raw.trim();
-    const parsed = JSON.parse(jsonStr);
-    if (Array.isArray(parsed)) {
-      return parsed.map(String);
-    }
-    return [];
-  } catch {
-    logger.warn('名称列表解析失败');
-    return [];
-  }
-}
+
 
 // ── 提示词预览（纯组装，不调用 API） ──
 
@@ -467,38 +357,3 @@ export function buildOnePassPrompts(request: AnalysisRequest): RolePrompt[] {
   ];
 }
 
-/** 组装两次调用模式的 prompt（用于调试预览） */
-export function buildTwoPassPrompts(request: AnalysisRequest): { triage: RolePrompt[]; update: RolePrompt[] } {
-  const chatText = request.chatMessages.join('\n---\n');
-
-  // 第 1 次：筛选
-  const namesList = request.entries.map((ae) => `- ${ae.entry.name}`).join('\n');
-  const triagePrompt = `以下是所有世界书条目名称：\n${namesList}\n\n请阅读最近的对话内容，判断哪些条目需要更新。\n仅返回需要更新的条目名称列表，JSON 数组格式。\n\n## 最近的对话内容\n${chatText}`;
-
-  const triageMsgs = buildTriagePromptMessages(request.allEntries);
-  const triage: RolePrompt[] = [
-    ...triageMsgs,
-    { role: 'user', content: triagePrompt } as RolePrompt,
-  ];
-
-  // 第 2 次：更新
-  const updateMsgs = buildUpdatePrompts(request.allEntries);
-
-  const entriesText = request.entries
-    .map((ae) => {
-      const constraintText = ae.constraint
-        ? `\n  约束: ${resolveMacros(ae.constraint.instruction, request.allEntries)}`
-        : '';
-      return `- ${ae.entry.name}:${constraintText}\n  当前内容: ${ae.entry.content}`;
-    })
-    .join('\n\n');
-
-  const updatePrompt = `## 需要更新的条目\n${entriesText}\n\n## 最近的对话内容\n${chatText}`;
-
-  const update: RolePrompt[] = [
-    ...updateMsgs,
-    { role: 'user', content: updatePrompt } as RolePrompt,
-  ];
-
-  return { triage, update };
-}

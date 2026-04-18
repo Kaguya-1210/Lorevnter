@@ -229,26 +229,6 @@
               </div>
             </div>
           </template>
-
-          <!-- 两次调用模式 -->
-          <template v-else>
-            <div class="debug-prompt-phase">第 1 次调用 — 筛选</div>
-            <div v-for="(p, i) in previewPrompts.triage" :key="'t'+i" class="debug-prompt-card" :class="'debug-prompt-' + p.role">
-              <div class="debug-prompt-role" :class="'debug-prompt-role-' + p.role">{{ p.role.toUpperCase() }}</div>
-              <pre class="debug-prompt-content" :class="{ 'debug-prompt-collapsed': !expandedPreviews[`t_${i}`] && p.content.length > 200 }" @click="togglePreviewExpand(`t_${i}`)">{{ p.content }}</pre>
-              <div v-if="p.content.length > 200" class="debug-prompt-expand" @click="togglePreviewExpand(`t_${i}`)">
-                {{ expandedPreviews[`t_${i}`] ? '收起 ▲' : '展开全文 ▼' }}
-              </div>
-            </div>
-            <div class="debug-prompt-phase">第 2 次调用 — 更新</div>
-            <div v-for="(p, i) in previewPrompts.update" :key="'u'+i" class="debug-prompt-card" :class="'debug-prompt-' + p.role">
-              <div class="debug-prompt-role" :class="'debug-prompt-role-' + p.role">{{ p.role.toUpperCase() }}</div>
-              <pre class="debug-prompt-content" :class="{ 'debug-prompt-collapsed': !expandedPreviews[`u_${i}`] && p.content.length > 200 }" @click="togglePreviewExpand(`u_${i}`)">{{ p.content }}</pre>
-              <div v-if="p.content.length > 200" class="debug-prompt-expand" @click="togglePreviewExpand(`u_${i}`)">
-                {{ expandedPreviews[`u_${i}`] ? '收起 ▲' : '展开全文 ▼' }}
-              </div>
-            </div>
-          </template>
         </template>
       </div>
     </div>
@@ -356,12 +336,9 @@
           </div>
         </div>
 
-        <!-- 触发审核弹窗（模拟 AI 返回结果） -->
+        <!-- 说明：测试写入已集成审核弹窗 -->
         <div class="st-row" style="margin-top:8px;border-top:1px solid var(--lore-border);padding-top:8px">
-          <button class="st-btn st-btn-test" @click="onTriggerReview">
-            📋 触发审核弹窗
-          </button>
-          <span class="st-hint">使用假数据模拟 AI 返回结果，测试审核流程</span>
+          <span class="st-hint">💡 点击「🧪 执行测试写入」后会先弹出审核弹窗，确认后才写入。审核通过的条目支持回档恢复。</span>
         </div>
       </div>
     </div>
@@ -485,53 +462,7 @@ function onDiscardSnapshot() {
   toastr.info('快照已丢弃，测试数据已保留', 'Lorevnter');
 }
 
-// ── 审核弹窗 ──
 
-/** 触发审核弹窗（使用假数据模拟 AI 返回结果） */
-function onTriggerReview() {
-  const mockUpdates: ReviewUpdate[] = [
-    {
-      entryName: '艾莉丝·创世录',
-      originalContent: '艾莉丝是王国的公主\n她拥有金色的长发',
-      newContent: '艾莉丝是王国的公主\n她拥有金色的长发\n最近与红龙建立了契约',
-      reason: '新增剧情发展：契约事件',
-      approved: null,
-      action: 'update',
-      uid: 101,
-      worldbook: '测试世界书',
-    },
-    {
-      entryName: '红龙·创世录',
-      originalContent: '红龙是古老的守护者\n它沉睡在火山深处',
-      newContent: '红龙是古老的守护者\n它沉睡在火山深处\n现已被艾莉丝唤醒，与其缔结契约',
-      reason: '状态变更：从沉睡变为觉醒',
-      approved: null,
-      action: 'update',
-      uid: 102,
-      worldbook: '测试世界书',
-    },
-    {
-      entryName: '契约魔法',
-      originalContent: '',
-      newContent: '契约魔法是一种古老的束缚术\n缔结双方必须在满月之夜进行仪式\n契约建立后双方可以感知彼此的情绪',
-      reason: '新增世界观设定',
-      approved: null,
-      action: 'create',
-      uid: -1,
-      worldbook: '测试世界书',
-    },
-  ];
-
-  openReviewEditor(mockUpdates, (approved) => {
-    const updateCount = approved.filter(u => u.action === 'update').length;
-    const createCount = approved.filter(u => u.action === 'create').length;
-    toastr.success(
-      `审核完成！将执行 ${updateCount} 条修改、${createCount} 条新增\n（测试模式，实际不写入）`,
-      'Lorevnter',
-      { timeOut: 5000 },
-    );
-  });
-}
 
 // ── 缓存信息 ──
 const cacheStats = ref(getCacheStats());
@@ -585,11 +516,9 @@ const aiHistoryReversed = computed(() =>
 );
 
 // ── 提示词预览 ──
-interface PromptPreviewOnepass { mode: 'onepass'; onepass: RolePrompt[] }
-interface PromptPreviewTwopass { mode: 'twopass'; triage: RolePrompt[]; update: RolePrompt[] }
-type PromptPreview = PromptPreviewOnepass | PromptPreviewTwopass;
+interface PromptPreviewData { mode: 'onepass'; onepass: RolePrompt[] }
 
-const previewPrompts = ref<PromptPreview | null>(null);
+const previewPrompts = ref<PromptPreviewData | null>(null);
 const previewLoading = ref(false);
 const previewError = ref('');
 
@@ -920,15 +849,7 @@ function startDiagnostics() {
   display: flex;
   gap: 8px;
 }
-.st-btn-danger {
-  background: rgba(255, 59, 48, 0.15) !important;
-  color: #ff3b30 !important;
-  border-color: rgba(255, 59, 48, 0.3) !important;
-}
-.st-btn-danger:hover {
-  background: #ff3b30 !important;
-  color: #fff !important;
-}
+
 
 /* 缓存条目列表 */
 .debug-cache-names {
