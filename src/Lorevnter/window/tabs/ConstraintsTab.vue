@@ -14,6 +14,7 @@
           <div class="ct-card-header">
             <span class="ct-card-icon">{{ c.type === 'skip' ? '🚫' : '🏷' }}</span>
             <span class="ct-card-name">{{ c.name }}</span>
+            <span class="ct-card-scope" :class="c.scope ?? 'global'">{{ (c.scope ?? 'global') === 'global' ? '全局' : '局部' }}</span>
           </div>
           <div v-if="c.type === 'prompt' && c.instruction" class="ct-card-preview">
             {{ c.instruction.slice(0, 60) }}{{ c.instruction.length > 60 ? '…' : '' }}
@@ -45,6 +46,13 @@
               <option value="skip">🚫 跳过</option>
             </select>
           </label>
+          <label class="ct-label">
+            作用域
+            <select v-model="selected.scope" class="ct-select">
+              <option value="global">🌐 全局（跨角色卡复用）</option>
+              <option value="local">📌 局部（仅当前角色卡）</option>
+            </select>
+          </label>
           <label v-if="selected.type === 'prompt'" class="ct-label">
             提示词模板
             <textarea
@@ -66,51 +74,51 @@
 
       <!-- 条目绑定 -->
       <div class="ct-section">
-        <div class="ct-section-title">条目绑定</div>
-        <div v-if="!bindWorldbook" class="ct-bind-select">
-          <div class="ct-bind-hint">选择一个世界书来管理条目绑定</div>
-          <div class="ct-bind-list">
-            <button
-              v-for="name in worldbookNames"
-              :key="name"
-              class="ct-btn ct-btn-outline"
-              @click="onSelectBindWorldbook(name)"
-            >
-              {{ name }}
-            </button>
-          </div>
+        <div class="ct-section-title">
+          条目绑定
+          <span v-if="bindWorldbook" class="ct-bind-wb-label">{{ bindWorldbook }}</span>
         </div>
+        <div v-if="!bindWorldbook" class="ct-empty">请先打开角色卡</div>
         <template v-else>
-          <div class="ct-bind-header">
-            <span class="ct-bind-wb-name">{{ bindWorldbook }}</span>
-            <div class="ct-bind-header-actions">
-              <button class="ct-btn ct-btn-small ct-btn-outline" @click="isBindListExpanded = !isBindListExpanded">
-                {{ isBindListExpanded ? '收起列表' : '展开条目' }}
-              </button>
-              <button class="ct-btn ct-btn-small" @click="bindWorldbook = null">← 返回</button>
+          <!-- 搜索 + 操作栏 -->
+          <div class="entry-popup-toolbar" style="padding: 0 0 8px 0; border: none;">
+            <input
+              type="text"
+              v-model="bindSearchQuery"
+              class="entry-popup-search"
+              placeholder="🔍 搜索条目..."
+            />
+            <div class="entry-popup-actions">
+              <span class="entry-filter-stat">已绑 {{ bindSelectedCount }} / 全部 {{ bindEntries.length }}</span>
+              <button class="entry-filter-btn" @click="onBindSelectAll">全选</button>
+              <button class="entry-filter-btn" @click="onBindClearAll">清空</button>
+              <button class="entry-filter-btn" @click="onBindInvert">反选</button>
             </div>
           </div>
+
+          <!-- 条目列表 -->
           <div v-if="bindLoading" class="ct-loading">加载中...</div>
-          <div v-else v-show="isBindListExpanded" class="ct-bind-entries">
+          <div v-else class="ct-bind-entries">
+            <div v-if="filteredBindEntries.length === 0" class="ct-empty">
+              {{ bindEntries.length === 0 ? '该世界书无条目' : '无匹配条目' }}
+            </div>
             <label
-              v-for="entry in bindEntries"
+              v-for="entry in filteredBindEntries"
               :key="entry.uid"
               class="ct-bind-entry"
+              :class="{ 'ct-bind-entry-bound': isEntryBound(entry) }"
             >
               <input
                 type="checkbox"
-                class="ios-toggle ios-toggle-sm"
-                :checked="entry.extra?.lore_constraint_id === selected.id"
+                class="entry-filter-checkbox"
+                :checked="isEntryBound(entry)"
                 @change="onToggleBind(entry, $event)"
               />
-              <span class="ct-bind-entry-strategy">{{ getStrategyIcon(entry) }}</span>
               <span class="ct-bind-entry-name">{{ entry.name || '(未命名)' }}</span>
-              <span v-if="entry.extra?.lore_macro" class="ct-bind-entry-macro">{{ formatMacro(entry) }}</span>
               <span v-if="isBoundToOther(entry)" class="ct-bind-entry-other">
                 (已绑定其他)
               </span>
             </label>
-            <div v-if="bindEntries.length === 0" class="ct-empty">该世界书无条目</div>
           </div>
         </template>
       </div>
@@ -131,6 +139,13 @@
             <option value="skip">🚫 跳过</option>
           </select>
         </label>
+        <label class="ct-label">
+          作用域
+          <select v-model="newScope" class="ct-select">
+            <option value="global">🌐 全局（跨角色卡复用）</option>
+            <option value="local">📌 局部（仅当前角色卡）</option>
+          </select>
+        </label>
         <div class="ct-dialog-actions">
           <button class="ct-btn" @click="showCreateDialog = false">取消</button>
           <button class="ct-btn ct-btn-accent" :disabled="!newName.trim()" @click="onCreate">创建</button>
@@ -144,6 +159,7 @@
 import { useSettingsStore, type LoreConstraint } from '../../settings';
 import * as Constraints from '../../core/constraints';
 import * as WorldbookAPI from '../../core/worldbook-api';
+import { useContextStore } from '../../core/worldbook-context';
 
 const { settings } = useSettingsStore();
 
@@ -158,14 +174,16 @@ const selected = computed(() =>
 const showCreateDialog = ref(false);
 const newName = ref('');
 const newType = ref<LoreConstraint['type']>('prompt');
+const newScope = ref<'global' | 'local'>('global');
 
 function onCreate() {
   if (!newName.value.trim()) return;
-  const c = Constraints.createConstraint(newName.value.trim(), newType.value);
+  const c = Constraints.createConstraint(newName.value.trim(), newType.value, '', newScope.value);
   selectedId.value = c.id;
   showCreateDialog.value = false;
   newName.value = '';
   newType.value = 'prompt';
+  newScope.value = 'global';
 }
 
 function onDelete() {
@@ -183,28 +201,49 @@ function getRefCount(_constraintId: string): number {
 }
 
 // ── 条目绑定 ──
-const worldbookNames = ref<string[]>([]);
 const bindWorldbook = ref<string | null>(null);
 const bindEntries = ref<WorldbookEntry[]>([]);
 const bindLoading = ref(false);
-const isBindListExpanded = ref(true); // 仅控制 UI 折叠
+const bindSearchQuery = ref('');
 
-// ── 蓝灯/绿灯策略图标（纯 UI 辅助） ──
-function getStrategyIcon(entry: WorldbookEntry): string {
-  if (!entry.enabled) return '⚫';
-  switch (entry.strategy?.type) {
-    case 'constant': return '🔵';
-    case 'selective': return '🟢';
-    case 'vectorized': return '🔗';
-    default: return '●';
-  }
-}
-
-onMounted(() => {
-  worldbookNames.value = WorldbookAPI.listAll();
+/** 搜索过滤后的条目 */
+const filteredBindEntries = computed(() => {
+  const q = bindSearchQuery.value.trim().toLowerCase();
+  if (!q) return bindEntries.value;
+  return bindEntries.value.filter(e =>
+    (e.name || `uid_${e.uid}`).toLowerCase().includes(q)
+  );
 });
 
-async function onSelectBindWorldbook(name: string) {
+/** 获取当前约束对应的 characterId 过滤值 */
+function getBindCharId(): string {
+  if (!selected.value) return '';
+  return (selected.value.scope ?? 'global') === 'local'
+    ? (useContextStore().context.characterName ?? '')
+    : '';
+}
+
+/** 已绑定数量 */
+const bindSelectedCount = computed(() => {
+  if (!selected.value || !bindWorldbook.value) return 0;
+  const cId = selected.value.id;
+  const wb = bindWorldbook.value;
+  const charId = getBindCharId();
+  return settings.lore_constraint_bindings.filter(
+    b => b.constraintId === cId && b.worldbook === wb && b.characterId === charId
+  ).length;
+});
+
+onMounted(async () => {
+  // 自动绑定角色卡主世界书
+  const ctx = useContextStore();
+  const primaryWb = ctx.context.character?.primary;
+  if (primaryWb) {
+    await loadBindWorldbook(primaryWb);
+  }
+});
+
+async function loadBindWorldbook(name: string) {
   bindWorldbook.value = name;
   bindLoading.value = true;
   try {
@@ -217,30 +256,98 @@ async function onSelectBindWorldbook(name: string) {
   }
 }
 
-async function onToggleBind(entry: WorldbookEntry, event: Event) {
+/** 全选（基于 filteredBindEntries 智能适配搜索） */
+function onBindSelectAll() {
   if (!selected.value || !bindWorldbook.value) return;
-  const checked = (event.target as HTMLInputElement).checked;
-  try {
-    if (checked) {
-      await Constraints.bindConstraintToEntries(bindWorldbook.value, [entry.uid], selected.value.id);
-    } else {
-      await Constraints.unbindConstraintFromEntries(bindWorldbook.value, [entry.uid]);
+  const cId = selected.value.id;
+  const wb = bindWorldbook.value;
+  const charId = getBindCharId();
+
+  for (const entry of filteredBindEntries.value) {
+    const exists = settings.lore_constraint_bindings.some(
+      b => b.constraintId === cId && b.worldbook === wb && b.entryUid === entry.uid && b.characterId === charId
+    );
+    if (!exists) {
+      settings.lore_constraint_bindings.push({ constraintId: cId, worldbook: wb, entryUid: entry.uid, characterId: charId });
     }
-    // 刷新条目列表
-    bindEntries.value = await WorldbookAPI.fetch(bindWorldbook.value);
-  } catch {
-    // toast 已在 constraints.ts 中处理
+  }
+  toastr.success(`已绑定 ${filteredBindEntries.value.length} 条`, 'Lorevnter');
+}
+
+/** 清空（基于 filteredBindEntries 智能适配搜索） */
+function onBindClearAll() {
+  if (!selected.value || !bindWorldbook.value) return;
+  const cId = selected.value.id;
+  const wb = bindWorldbook.value;
+  const charId = getBindCharId();
+  const removeUids = new Set(filteredBindEntries.value.map(e => e.uid));
+
+  settings.lore_constraint_bindings = settings.lore_constraint_bindings.filter(
+    b => !(b.constraintId === cId && b.worldbook === wb && b.characterId === charId && removeUids.has(b.entryUid))
+  );
+  toastr.info(`已解绑 ${removeUids.size} 条`, 'Lorevnter');
+}
+
+/** 反选（基于 filteredBindEntries 智能适配搜索） */
+function onBindInvert() {
+  if (!selected.value || !bindWorldbook.value) return;
+  const cId = selected.value.id;
+  const wb = bindWorldbook.value;
+  const charId = getBindCharId();
+
+  for (const entry of filteredBindEntries.value) {
+    const idx = settings.lore_constraint_bindings.findIndex(
+      b => b.constraintId === cId && b.worldbook === wb && b.entryUid === entry.uid && b.characterId === charId
+    );
+    if (idx >= 0) {
+      settings.lore_constraint_bindings.splice(idx, 1);
+    } else {
+      settings.lore_constraint_bindings.push({ constraintId: cId, worldbook: wb, entryUid: entry.uid, characterId: charId });
+    }
   }
 }
 
-function formatMacro(entry: WorldbookEntry): string {
-  return `{{${entry.extra?.lore_macro ?? ''}}}`;
+/** 检查条目是否绑定到当前选中的约束（新绑定表 + characterId 隔离） */
+function isEntryBound(entry: WorldbookEntry): boolean {
+  if (!selected.value || !bindWorldbook.value) return false;
+  const charId = getBindCharId();
+  return settings.lore_constraint_bindings.some(
+    b => b.constraintId === selected.value!.id && b.worldbook === bindWorldbook.value && b.entryUid === entry.uid && b.characterId === charId
+  );
 }
 
+/** 切换绑定（新绑定表 + characterId 隔离） */
+function onToggleBind(entry: WorldbookEntry, event: Event) {
+  if (!selected.value || !bindWorldbook.value) return;
+  const checked = (event.target as HTMLInputElement).checked;
+  const wb = bindWorldbook.value;
+  const cId = selected.value.id;
+  const charId = getBindCharId();
+
+  if (checked) {
+    const exists = settings.lore_constraint_bindings.some(
+      b => b.constraintId === cId && b.worldbook === wb && b.entryUid === entry.uid && b.characterId === charId
+    );
+    if (!exists) {
+      settings.lore_constraint_bindings.push({ constraintId: cId, worldbook: wb, entryUid: entry.uid, characterId: charId });
+    }
+  } else {
+    const idx = settings.lore_constraint_bindings.findIndex(
+      b => b.constraintId === cId && b.worldbook === wb && b.entryUid === entry.uid && b.characterId === charId
+    );
+    if (idx >= 0) settings.lore_constraint_bindings.splice(idx, 1);
+  }
+}
+
+/** 检查条目是否绑定到「其他」约束（绑定表 + 旧 extra 兼容） */
 function isBoundToOther(entry: WorldbookEntry): boolean {
-  if (!selected.value) return false;
-  const cid = entry.extra?.lore_constraint_id;
-  return !!cid && cid !== selected.value.id;
+  if (!selected.value || !bindWorldbook.value) return false;
+  const otherBinding = settings.lore_constraint_bindings.some(
+    b => b.worldbook === bindWorldbook.value && b.entryUid === entry.uid && b.constraintId !== selected.value!.id
+  );
+  if (otherBinding) return true;
+  const legacyId = entry.extra?.lore_constraint_id;
+  return !!legacyId && legacyId !== selected.value.id;
 }
 </script>
 
@@ -273,6 +380,12 @@ function isBoundToOther(entry: WorldbookEntry): boolean {
 .ct-card-icon { font-size: 16px; }
 .ct-card-name { font-size: 15px; font-weight: 500; color: var(--lore-text-primary); flex: 1; letter-spacing: -0.2px; }
 .ct-card-refs { font-size: 12px; color: var(--lore-text-secondary); }
+.ct-card-scope {
+  font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+  text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0;
+}
+.ct-card-scope.global { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+.ct-card-scope.local { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
 .ct-card-preview { font-size: 13px; color: var(--lore-text-secondary); margin-top: 6px; line-height: 1.4; }
 .ct-skip-hint { font-style: italic; }
 
@@ -292,25 +405,18 @@ function isBoundToOther(entry: WorldbookEntry): boolean {
 .ct-form-actions { display: flex; justify-content: flex-end; margin-top: 4px; }
 
 /* 条目绑定 */
-.ct-bind-select { display: flex; flex-direction: column; gap: 10px; }
-.ct-bind-hint { font-size: 13px; color: var(--lore-text-secondary); margin-bottom: 4px;}
-.ct-bind-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.ct-bind-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--lore-border-light);}
-.ct-bind-header-actions { display: flex; gap: 8px; }
-.ct-bind-wb-name { font-size: 15px; font-weight: 600; color: var(--lore-text-primary); }
-.ct-bind-entries { display: flex; flex-direction: column; max-height: 250px; overflow-y: auto; background: var(--lore-bg-primary); border-radius: var(--lore-radius-md); padding: 4px 0;}
+.ct-bind-wb-label { font-size: 11px; font-weight: 400; color: var(--lore-accent); background: var(--lore-accent-bg); padding: 2px 8px; border-radius: 8px; margin-left: 8px; text-transform: none; letter-spacing: 0; }
+.ct-bind-entries { display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; background: var(--lore-bg-primary); border-radius: var(--lore-radius-md); padding: 4px 0;}
 .ct-bind-entry {
-  display: flex; align-items: center; gap: 14px; padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
   cursor: pointer; transition: background 0.15s;
-  font-size: 15px; color: var(--lore-text-primary);
+  font-size: 14px; color: var(--lore-text-primary);
   border-bottom: 1px solid var(--lore-border-light);
-  min-height: 44px; /* 触控最小区域 */
 }
 .ct-bind-entry:last-child { border-bottom: none; }
 .ct-bind-entry:hover { background: var(--lore-bg-tertiary); }
+.ct-bind-entry-bound { background: var(--lore-accent-bg); }
 .ct-bind-entry-name { flex: 1; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ct-bind-entry-strategy { font-size: 12px; flex-shrink: 0; }
-.ct-bind-entry-macro { font-size: 12px; color: var(--lore-accent); font-family: monospace; background: var(--lore-accent-bg); padding: 2px 6px; border-radius: 6px;}
 .ct-bind-entry-other { font-size: 12px; color: var(--lore-text-tertiary); font-style: italic; }
 
 /* 按钮 */

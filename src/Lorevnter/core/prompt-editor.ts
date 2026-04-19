@@ -11,78 +11,114 @@ const POPUP_ID = 'lorevnter-prompt-editor';
 
 /** 更新阶段（一次调用 / twopass 第2次调用） */
 export const BUILTIN_UPDATE_PRESET: PromptItem[] = [
+  // ── 顶部：强注意力区 → 角色定义 + 约束规则 ──
   {
     id: 'builtin_update_sys',
     role: 'system',
-    name: '系统指令',
+    name: '系统指令 + 约束',
     enabled: true,
-    content: `<role>你是 Lorevnter 世界书条目更新引擎。你不是对话参与者，你是一个数据处理管线。</role>
+    content: `<role>你是 Lorevnter 世界书条目更新引擎。你的职责是让世界书条目始终与剧情发展同步，保持信息精确、具体、完整。</role>
 
-<task>分析对话内容，判断世界书条目是否需要更新，输出 JSON 结果。</task>
+<constraints>
+{{lore_constraints}}
+</constraints>
 
-<analysis_steps>
-按以下步骤逐条分析每个条目：
-1. 读取条目当前内容，提取其中记录的关键事实点
-2. 扫描最近对话内容，查找与该条目事实点直接相关的新信息
-3. 判断：对话中是否存在与条目内容矛盾的事实，或需要补充的新事实？
-4. 若是 → 生成 update：newContent 必须是更新后的完整内容
-5. 若条目附带 constraint（约束指令）→ 严格按约束条件判断更新方式
-6. 若无相关变化 → 跳过该条目，不输出任何内容
-</analysis_steps>
+<constraint_priority>
+{{lore_constraint_policy}}
+</constraint_priority>
 
-<rules>
-<rule id="R1" priority="critical">仅关注事实性变化：对话中必须存在与条目内容直接矛盾或需要补充的新事实。</rule>
-<rule id="R2" priority="critical">完整替换：newContent 是条目完整内容，不是增量补丁。</rule>
-<rule id="R3" priority="high">保留原有结构：延续条目原有的格式、分段、标记风格。</rule>
-<rule id="R4" priority="high">禁止推测：对话中没有直接涉及的条目「不需要更新」。</rule>
-<rule id="R5" priority="high">约束优先：条目附带 constraint 时，严格遵循约束格式和更新条件。</rule>
-<rule id="R6" priority="critical">纯 JSON 输出：只输出 JSON 对象，不输出任何前缀、后缀、解释、markdown 代码块。</rule>
-</rules>
+<update_strategy>
+你需要在以下情况更新条目：
+1. 对话中出现了与条目内容矛盾的新事实
+2. 对话中出现了条目未记录的新信息（新事件、新关系、状态变化等）
+3. 条目中存在模糊/笼统的描述，而你能从对话或其他条目中找到具体信息来替换
+   例：条目写"成员极少" → 交叉比对其他条目和对话，找到具体成员名单直接填入
+4. 条目附带约束时，严格按约束规则执行
 
-<output_schema>
-{
-  "updates": [
-    {
-      "entryName": "条目名称（必须与输入完全匹配）",
-      "newContent": "更新后的完整内容",
-      "reason": "简洁更新理由（一句话）"
-    }
-  ]
-}
-无需更新时返回：{"updates": []}
-</output_schema>`,
+你不应该更新的情况：
+- 对话完全没有涉及该条目相关的内容
+- 变化仅是措辞不同但含义相同
+</update_strategy>
+
+<output_rules>
+<rule priority="critical">newContent 是完整替换内容，保留所有未变化的原有信息，不得丢失</rule>
+<rule priority="critical">保留条目原有的格式和写作风格</rule>
+<rule priority="critical">约束优先级高于一切默认策略</rule>
+<rule priority="critical">思考结束后输出纯 JSON，不加额外文字</rule>
+</output_rules>`,
   },
+  // ── 中部：弱注意力区 → 数据块 ──
   {
-    id: 'builtin_update_wb',
+    id: 'builtin_update_entries',
     role: 'user',
-    name: '世界书条目',
+    name: '条目数据',
     enabled: true,
-    content: `## 待分析的世界书条目（共 {{lore_entry_count}} 条）
-
-{{lore_worldbook}}`,
+    content: `<worldbook_entries count="{{lore_entry_count}}">
+{{lore_entries}}
+</worldbook_entries>`,
   },
   {
     id: 'builtin_update_ctx',
     role: 'user',
     name: '上下文正文',
     enabled: true,
-    content: `## 最近 {{lore_max_context}} 条对话内容
-
-{{lore_context}}`,
+    content: `<chat_context recent="{{lore_max_context}}">
+{{lore_context}}
+</chat_context>`,
   },
+  // ── 底部：极强注意力区 → CoT 思考指令 + 输出格式 ──
   {
     id: 'builtin_update_task',
     role: 'user',
-    name: '执行指令',
+    name: 'CoT 思考指令',
     enabled: true,
-    content: `请根据上述对话内容，逐条分析世界书条目是否需要更新。严格按照系统指令的规则和输出格式返回 JSON。`,
+    content: `<task>
+分析对话和条目数据，判断哪些条目需要更新。
+
+先在 <lore_think> 中思考，每条认真分析不许偷懒，想多少写多少！
+
+<lore_think>
+对每个条目自由分析，重点关注：
+- 这个条目记录了什么？和最新剧情（<latest_context>）有关系吗？
+- 对话中有没有新信息要补进去？有没有和现有内容矛盾的地方？
+- 条目里有没有模糊的说法？（如"极少""一些""可能"等）能不能从对话或其他条目里找到具体信息替换掉？
+- 有约束吗？约束怎么说的？
+- 要不要改？要改的话，改哪里？
+</lore_think>
+
+想完了直接出 JSON。
+</task>
+
+<output_format>
+{
+  "updates": [
+    {
+      "entryName": "条目名（必须与输入完全匹配）",
+      "entryUid": 条目uid数字（从entry标签的uid属性获取）,
+      "newContent": "完整的新内容（保留未变化的部分）",
+      "reason": "一句话理由"
+    }
+  ]
+}
+没有要改的就返回：{"updates": []}
+</output_format>
+
+<final_reminder>
+1. 逐条分析，不跳过
+2. 模糊词必须精确化：交叉比对条目和对话找具体信息
+3. 约束规则最优先
+4. 思考完直接输出 JSON
+</final_reminder>`,
   },
   {
     id: 'builtin_update_ast',
     role: 'assistant',
     name: 'CoT 锚定',
     enabled: true,
-    content: `{"updates": [`,
+    content: `<lore_think>
+我将逐条分析每个条目：
+
+`,
   },
 ];
 

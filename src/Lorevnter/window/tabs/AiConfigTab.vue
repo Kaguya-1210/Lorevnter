@@ -159,6 +159,126 @@
       </div>
     </div>
 
+    <!-- 条目处理范围 -->
+    <div class="st-group">
+      <div class="st-group-title">条目处理范围</div>
+
+      <div class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">过滤模式</span>
+          <select v-model="settings.lore_entry_filter_mode" class="st-select" @change="onFilterModeChange">
+            <option value="all">全部条目</option>
+            <option value="include">仅处理指定条目</option>
+            <option value="exclude">排除指定条目</option>
+          </select>
+        </div>
+        <span class="st-hint">
+          {{ settings.lore_entry_filter_mode === 'all' ? '分析所有候选条目（默认）' :
+             settings.lore_entry_filter_mode === 'include' ? '仅选中的条目参与 AI 分析' :
+             '选中的条目将被排除，不参与 AI 分析' }}
+        </span>
+      </div>
+
+      <!-- 条目选择器（仅 include/exclude 模式显示） -->
+      <template v-if="settings.lore_entry_filter_mode !== 'all'">
+        <!-- 当前作用世界书提示 + 摘要 -->
+        <div class="st-row" v-if="filterCharWbNames.length > 0">
+          <div style="display:flex;flex-direction:column;gap:4px;width:100%;">
+            <span class="st-hint" style="font-weight:500;">
+              📚 当前角色卡世界书：{{ filterCharWbNames.join('、') }}
+            </span>
+            <span v-for="s in filterSummary" :key="s.wb" class="st-hint">
+              {{ s.wb }}: {{ s.count }} 条目已选
+            </span>
+          </div>
+        </div>
+        <div class="st-row" v-else>
+          <span class="st-hint st-hint-err">⚠ 未检测到角色卡内置世界书，请先打开一个角色卡聊天</span>
+        </div>
+
+        <!-- 打开选择弹窗按钮 -->
+        <div class="st-row" v-if="filterCharWbNames.length > 0">
+          <button class="debug-action-btn" style="width:100%;" @click="openFilterPopup">
+            📋 选择条目
+          </button>
+        </div>
+
+        <!-- 额外世界书封印 -->
+        <div class="st-row">
+          <span class="st-hint" style="opacity:0.6;">🔒 额外世界书：功能暂时封印，未来再开</span>
+        </div>
+      </template>
+    </div>
+
+    <!-- 条目选择弹窗 (Teleport 到酒馆 body) -->
+    <Teleport :to="teleportTarget">
+      <div v-if="filterPopupOpen" class="entry-popup-overlay" @click.self="closeFilterPopup">
+        <div class="entry-popup">
+          <!-- 弹窗头 -->
+          <div class="entry-popup-header">
+            <span class="entry-popup-title">
+              {{ settings.lore_entry_filter_mode === 'include' ? '选择要处理的条目' : '选择要排除的条目' }}
+            </span>
+            <button class="entry-popup-close" @click="closeFilterPopup">✕</button>
+          </div>
+
+          <!-- 世界书 Tab -->
+          <div class="entry-popup-tabs" v-if="filterCharWbNames.length > 1">
+            <button
+              v-for="wb in filterCharWbNames" :key="wb"
+              class="entry-filter-wb-tab"
+              :class="{ active: filterActiveWb === wb }"
+              @click="switchFilterWb(wb)"
+            >{{ wb }}</button>
+          </div>
+
+          <!-- 搜索 + 操作栏 -->
+          <div class="entry-popup-toolbar">
+            <input
+              type="text"
+              v-model="filterSearchQuery"
+              class="entry-popup-search"
+              placeholder="🔍 搜索条目..."
+            />
+            <div class="entry-popup-actions">
+              <span class="entry-filter-stat">已选 {{ filterSelectedCount }} / 全部 {{ filterEntries.length }}</span>
+              <button class="entry-filter-btn" @click="onFilterSelectAll">全选</button>
+              <button class="entry-filter-btn" @click="onFilterClearAll">清空</button>
+              <button class="entry-filter-btn" @click="onFilterInvert">反选</button>
+            </div>
+          </div>
+
+          <!-- 条目列表 -->
+          <div class="entry-popup-body">
+            <div v-if="filterEntriesLoading" class="debug-empty">加载中...</div>
+            <div v-else-if="filteredEntries.length === 0" class="debug-empty">
+              {{ filterEntries.length === 0 ? '该世界书无条目' : '无匹配条目' }}
+            </div>
+            <label
+              v-for="entry in filteredEntries"
+              :key="entry.uid"
+              class="entry-filter-item"
+              :class="{ 'entry-filter-selected': isEntrySelected(entry.uid) }"
+            >
+              <input
+                type="checkbox"
+                :checked="isEntrySelected(entry.uid)"
+                @change="onToggleEntry(entry.uid)"
+                class="entry-filter-checkbox"
+              />
+              <span class="entry-filter-name">{{ entry.name || `uid_${entry.uid}` }}</span>
+            </label>
+          </div>
+
+          <!-- 底部确认栏 -->
+          <div class="entry-popup-footer">
+            <span class="entry-filter-stat">已选择 {{ filterSelectedCount }} 条条目</span>
+            <button class="entry-filter-btn entry-filter-btn-confirm" @click="closeFilterPopup">✓ 确认</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- 采样参数 -->
     <div class="st-group">
       <div class="st-group-title">采样参数</div>
@@ -316,6 +436,158 @@ const newEntryWorldbooks = ref<string[]>(getAvailableWorldbooks());
 
 function refreshNewEntryWorldbooks() {
   newEntryWorldbooks.value = getAvailableWorldbooks();
+}
+
+// ── 条目处理范围 ──
+import * as WorldbookAPI from '../../core/worldbook-api';
+import { useContextStore } from '../../core/worldbook-context';
+
+interface FilterEntry { uid: number; name: string; }
+
+const filterActiveWb = ref('');
+const filterEntries = ref<FilterEntry[]>([]);
+const filterEntriesLoading = ref(false);
+
+/** 从 context store 获取管线实际处理的世界书名（与主管线完全对齐） */
+const filterCharWbNames = computed(() => {
+  const ctx = useContextStore();
+  return ctx.getActiveWorldbookNames();
+});
+
+/** 模式切换时自动加载第一本世界书条目 */
+async function onFilterModeChange() {
+  if (settings.lore_entry_filter_mode === 'all') return;
+  if (filterCharWbNames.value.length > 0 && !filterActiveWb.value) {
+    await switchFilterWb(filterCharWbNames.value[0]);
+  }
+}
+
+/** 切换世界书 Tab 并加载条目 */
+async function switchFilterWb(wb: string) {
+  filterActiveWb.value = wb;
+  filterEntries.value = [];
+  filterEntriesLoading.value = true;
+  try {
+    const entries = await WorldbookAPI.fetch(wb);
+    filterEntries.value = entries.map(e => ({ uid: e.uid, name: e.name }));
+  } catch (e) {
+    toastr.error(`加载条目失败: ${(e as Error).message}`, 'Lorevnter');
+  } finally {
+    filterEntriesLoading.value = false;
+  }
+}
+
+function isEntrySelected(uid: number): boolean {
+  const map = settings.lore_entry_filter_map;
+  const uids = map[filterActiveWb.value];
+  return uids ? uids.includes(uid) : false;
+}
+
+function onToggleEntry(uid: number) {
+  const wb = filterActiveWb.value;
+  if (!wb) return;
+
+  const map = settings.lore_entry_filter_map;
+  if (!map[wb]) map[wb] = [];
+
+  const idx = map[wb].indexOf(uid);
+  if (idx >= 0) {
+    map[wb].splice(idx, 1);
+  } else {
+    map[wb].push(uid);
+  }
+  // 清理空数组
+  if (map[wb].length === 0) delete map[wb];
+}
+
+function onFilterSelectAll() {
+  const wb = filterActiveWb.value;
+  if (!wb) return;
+  // filteredEntries 自动适配：有搜索=结果集，无搜索=全部
+  const targetUids = filteredEntries.value.map(e => e.uid);
+  const existing = new Set(settings.lore_entry_filter_map[wb] ?? []);
+  for (const uid of targetUids) existing.add(uid);
+  settings.lore_entry_filter_map[wb] = [...existing];
+}
+
+function onFilterClearAll() {
+  const wb = filterActiveWb.value;
+  if (!wb) return;
+  // filteredEntries 自动适配：有搜索=只清结果，无搜索=清全部
+  const removeUids = new Set(filteredEntries.value.map(e => e.uid));
+  const remaining = (settings.lore_entry_filter_map[wb] ?? []).filter(uid => !removeUids.has(uid));
+  if (remaining.length > 0) {
+    settings.lore_entry_filter_map[wb] = remaining;
+  } else {
+    delete settings.lore_entry_filter_map[wb];
+  }
+}
+
+const filterSelectedCount = computed(() => {
+  const uids = settings.lore_entry_filter_map[filterActiveWb.value];
+  return uids ? uids.length : 0;
+});
+
+const filterSummary = computed(() => {
+  const result: { wb: string; count: number }[] = [];
+  for (const [wb, uids] of Object.entries(settings.lore_entry_filter_map)) {
+    if (uids && uids.length > 0) {
+      result.push({ wb, count: uids.length });
+    }
+  }
+  return result;
+});
+
+// ── 弹窗控制 ──
+const filterPopupOpen = ref(false);
+const filterSearchQuery = ref('');
+
+/** Teleport 目标：酒馆的 parent body（iframe 外层） */
+const teleportTarget = computed(() => {
+  return (typeof window.parent !== 'undefined' ? window.parent : window).document.body;
+});
+
+async function openFilterPopup() {
+  filterSearchQuery.value = '';
+  // 自动加载第一本世界书
+  if (filterCharWbNames.value.length > 0 && !filterActiveWb.value) {
+    await switchFilterWb(filterCharWbNames.value[0]);
+  }
+  filterPopupOpen.value = true;
+}
+
+function closeFilterPopup() {
+  filterPopupOpen.value = false;
+}
+
+/** 搜索过滤后的条目 */
+const filteredEntries = computed(() => {
+  const q = filterSearchQuery.value.trim().toLowerCase();
+  if (!q) return filterEntries.value;
+  return filterEntries.value.filter(e =>
+    (e.name || `uid_${e.uid}`).toLowerCase().includes(q)
+  );
+});
+
+/** 反选 */
+function onFilterInvert() {
+  const wb = filterActiveWb.value;
+  if (!wb) return;
+  // 反选也基于当前搜索结果
+  const targetUids = filteredEntries.value.map(e => e.uid);
+  const selected = new Set(settings.lore_entry_filter_map[wb] ?? []);
+  for (const uid of targetUids) {
+    if (selected.has(uid)) {
+      selected.delete(uid);
+    } else {
+      selected.add(uid);
+    }
+  }
+  if (selected.size > 0) {
+    settings.lore_entry_filter_map[wb] = [...selected];
+  } else {
+    delete settings.lore_entry_filter_map[wb];
+  }
 }
 
 // ── 提取预览 ──
@@ -495,5 +767,61 @@ function onToggleAllPreset(event: Event) {
 .st-param-label {
   display: flex; align-items: center; justify-content: space-between;
   font-size: 14px; font-weight: 500; color: var(--lore-text-primary);
+}
+
+/* 条目处理范围 */
+.entry-filter-toolbar {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.entry-filter-stat {
+  font-size: 12px; color: var(--lore-text-secondary); flex: 1;
+}
+.entry-filter-btn {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--lore-border-light);
+  background: transparent; color: var(--lore-text-secondary);
+  font-size: 11px; cursor: pointer; transition: all 0.15s;
+}
+.entry-filter-btn:hover {
+  color: var(--lore-accent); border-color: var(--lore-accent);
+}
+.entry-filter-list {
+  max-height: 280px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 2px;
+  border: 1px solid var(--lore-border-light); border-radius: var(--lore-radius-sm);
+  padding: 4px;
+}
+.entry-filter-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 4px; cursor: pointer;
+  font-size: 13px; color: var(--lore-text-primary);
+  transition: background 0.15s;
+}
+.entry-filter-item:hover { background: var(--lore-bg-tertiary); }
+.entry-filter-selected {
+  background: var(--lore-accent-bg, rgba(59, 130, 246, 0.08));
+}
+.entry-filter-checkbox {
+  width: 16px; height: 16px; flex-shrink: 0;
+  accent-color: var(--lore-accent);
+}
+.entry-filter-name {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.debug-empty {
+  font-size: 13px; color: var(--lore-text-secondary); text-align: center; padding: 16px 0;
+}
+.entry-filter-wb-tabs {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.entry-filter-wb-tab {
+  padding: 5px 12px; border-radius: 6px; border: 1px solid var(--lore-border-light);
+  background: transparent; color: var(--lore-text-secondary);
+  font-size: 12px; cursor: pointer; transition: all 0.15s;
+}
+.entry-filter-wb-tab.active {
+  background: var(--lore-accent); color: #fff; border-color: var(--lore-accent);
+}
+.entry-filter-wb-tab:hover:not(.active) {
+  color: var(--lore-text-primary); border-color: var(--lore-text-tertiary);
 }
 </style>

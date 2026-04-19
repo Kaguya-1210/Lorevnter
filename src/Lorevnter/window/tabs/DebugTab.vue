@@ -229,6 +229,12 @@
               <span class="debug-key">上下文消息</span>
               <span class="debug-value">{{ previewPrompts.messageCount }} 条</span>
             </div>
+            <div class="debug-kv-item">
+              <span class="debug-key">预估 Token</span>
+              <span class="debug-value" :style="previewPrompts.estimatedTokens > 30000 ? 'color: var(--lore-danger)' : ''">
+                ≈ {{ previewPrompts.estimatedTokens.toLocaleString() }} tokens
+              </span>
+            </div>
           </div>
 
           <!-- 提示词卡片 -->
@@ -536,6 +542,8 @@ interface PromptPreviewData {
   entryCount: number;
   skippedCount: number;
   messageCount: number;
+  /** 粗略 Token 估算（英文约 4 字符/token，中文约 1.5 字符/token，取加权均值） */
+  estimatedTokens: number;
 }
 
 const previewPrompts = ref<PromptPreviewData | null>(null);
@@ -561,6 +569,11 @@ async function onBuildPreview() {
     const totalEntries = Object.values(request.worldbookMap).reduce((sum, arr) => sum + arr.length, 0);
     const skippedCount = totalEntries - request.entries.length;
 
+    // Token 估算：统计所有提示词总字符数
+    const totalChars = prompts.reduce((sum, p) => sum + p.content.length, 0);
+    // 粗略估算：中文为主的内容约 1.5 字符/token，混合取 ~2
+    const estimatedTokens = Math.ceil(totalChars / 2);
+
     previewPrompts.value = {
       mode: 'onepass',
       onepass: prompts,
@@ -568,6 +581,7 @@ async function onBuildPreview() {
       entryCount: request.entries.length,
       skippedCount,
       messageCount: request.chatMessages.length,
+      estimatedTokens,
     };
 
     toastr.success(`管线预览完成：${request.entries.length} 条目, ${request.chatMessages.length} 消息`, 'Lorevnter');

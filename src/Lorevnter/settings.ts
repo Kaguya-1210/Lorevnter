@@ -12,10 +12,22 @@ const LoreConstraintSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(['prompt', 'skip']),
+  /** 作用域: global=跨世界书复用, local=仅当前角色卡 */
+  scope: z.enum(['global', 'local']).default('global'),
   instruction: z.string().default(''),
   enabled: z.boolean().default(true),
 });
 export type LoreConstraint = z.infer<typeof LoreConstraintSchema>;
+
+// ── 约束绑定表 Schema（独立于世界书条目本体）──
+const ConstraintBindingSchema = z.object({
+  constraintId: z.string(),
+  worldbook: z.string(),
+  entryUid: z.number(),
+  /** 角色卡文件名（局约束隔离用，全局约束为空） */
+  characterId: z.string().default(''),
+});
+export type ConstraintBinding = z.infer<typeof ConstraintBindingSchema>;
 
 // ── 提示词条目 Schema ──
 const PromptItemSchema = z.object({
@@ -49,6 +61,11 @@ const PresetDataSchema = z.object({
   lore_scan_trigger: z.enum(['auto', 'manual']).default('manual'),
   lore_api_format: z.enum(['openai']).default('openai'),
   lore_api_model: z.string().default(''),
+  // 条目处理范围
+  lore_entry_filter_mode: z.enum(['all', 'include', 'exclude']).default('all'),
+  lore_entry_filter_map: z.record(z.string(), z.array(z.number())).default({}),
+  // 约束绑定表
+  lore_constraint_bindings: z.array(ConstraintBindingSchema).default([]),
 });
 export type PresetData = z.infer<typeof PresetDataSchema>;
 
@@ -76,6 +93,8 @@ const LorevnterSettings = z
     lore_scan_interval: z.number().default(1),
     /** 约束列表 */
     lore_constraints: z.array(LoreConstraintSchema).default([]),
+    /** 约束绑定表（独立于世界书条目本体） */
+    lore_constraint_bindings: z.array(ConstraintBindingSchema).default([]),
 
     // ── AI 配置 ──
     /** AI 系统提示词模板（旧字段，兼容回退） */
@@ -164,6 +183,12 @@ const LorevnterSettings = z
 
     // ── 测试模式（调试 Tab，写入假数据不走 API） ──
     lore_test_mode: z.boolean().default(false),
+
+    // ── 条目处理范围 ──
+    /** 条目过滤模式: all=全部, include=仅指定, exclude=排除指定 */
+    lore_entry_filter_mode: z.enum(['all', 'include', 'exclude']).default('all'),
+    /** 条目过滤映射: key=世界书名, value=条目uid列表 */
+    lore_entry_filter_map: z.record(z.string(), z.array(z.number())).default({}),
   })
   .prefault({});
 
@@ -180,6 +205,9 @@ function extractPresetData(settings: LorevnterSettingsType): PresetData {
     lore_scan_trigger: settings.lore_scan_trigger,
     lore_api_format: settings.lore_api_format,
     lore_api_model: settings.lore_api_model,
+    lore_entry_filter_mode: settings.lore_entry_filter_mode,
+    lore_entry_filter_map: settings.lore_entry_filter_map,
+    lore_constraint_bindings: settings.lore_constraint_bindings,
     // 注意：严格排除 lore_api_key 和 lore_api_base_url
   };
 }
@@ -194,6 +222,9 @@ function applyPresetData(settings: LorevnterSettingsType, data: PresetData): voi
   settings.lore_scan_trigger = data.lore_scan_trigger;
   settings.lore_api_format = data.lore_api_format;
   settings.lore_api_model = data.lore_api_model;
+  settings.lore_entry_filter_mode = data.lore_entry_filter_mode ?? 'all';
+  settings.lore_entry_filter_map = data.lore_entry_filter_map ?? {};
+  settings.lore_constraint_bindings = data.lore_constraint_bindings ?? [];
   // 注意：不覆盖 lore_api_key 和 lore_api_base_url
 }
 

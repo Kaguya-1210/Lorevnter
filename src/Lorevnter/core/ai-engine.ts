@@ -5,7 +5,7 @@
 
 import { createLogger } from '../logger';
 import { useSettingsStore } from '../settings';
-import { getEntryMacro, resolveMacros, resolveLoreMacros } from './constraints';
+import { getEntryMacro, getEntryConstraints, collectActiveConstraints, resolveMacros, resolveLoreMacros } from './constraints';
 import type { LoreConstraint } from '../settings';
 
 const logger = createLogger('ai-engine');
@@ -166,6 +166,8 @@ export async function testApiConnection(): Promise<{ ok: boolean; message: strin
 export interface AnalysisEntry {
   entry: WorldbookEntry;
   constraint: LoreConstraint | null;
+  /** 条目所属世界书名，用于约束绑定表查询和提示词展示 */
+  worldbookName?: string;
 }
 
 export interface AnalysisRequest {
@@ -183,6 +185,8 @@ export interface UpdateInstruction {
   entryName: string;
   newContent: string;
   reason: string;
+  /** 条目 uid（AI 返回时可能包含，用于精确定位） */
+  entryUid?: number;
 }
 
 export interface AnalysisResult {
@@ -211,22 +215,76 @@ import { getActivePreset, BUILTIN_UPDATE_PRESET } from './prompt-editor';
 
 // ── 数据提取 ──
 
-/** 将分析条目格式化为文本（供宏 {{lore_worldbook}} 使用） */
+/** 将分析条目格式化为文本（供旧宏 {{lore_worldbook}} 兼容使用） */
 function formatWorldbookEntries(entries: AnalysisEntry[], allEntries: WorldbookEntry[]): string {
   return entries
     .map((ae) => {
       const constraintText = ae.constraint
-        ? `\n  约束: ${resolveMacros(ae.constraint.instruction, allEntries)}`
+        ? `\n<constraint>${resolveMacros(ae.constraint.instruction, allEntries)}</constraint>`
         : '';
       const macroText = getEntryMacro(ae.entry) ? ` (宏: {{${getEntryMacro(ae.entry)}}})` : '';
-      return `- ${ae.entry.name}${macroText}:${constraintText}\n  当前内容: ${ae.entry.content}`;
+      const renderedContent = substitudeMacros(ae.entry.content);
+      return `<entry name="${ae.entry.name}"${macroText}>${constraintText}\n<content>${renderedContent}</content>\n</entry>`;
     })
     .join('\n\n');
 }
 
+/**
+ * 三块式结构 - 条目数据块
+ * 每条目列出：名称、所属世界书、约束ID引用、当前内容
+ */
+function formatEntriesBlock(entries: AnalysisEntry[]): string {
+  return entries
+    .map((ae) => {
+      const constraints = getEntryConstraints(ae.entry, ae.worldbookName);
+      const constraintIds = constraints.map(c => `${c.scope === 'local' ? 'L' : 'G'}:${c.name}`);
+      const constraintRef = constraintIds.length > 0 ? `\n<constraints>${constraintIds.join(', ')}</constraints>` : '';
+      const renderedContent = substitudeMacros(ae.entry.content);
+      const wbAttr = ae.worldbookName ? ` worldbook="${ae.worldbookName}"` : '';
+      return `<entry name="${ae.entry.name}" uid="${ae.entry.uid}"${wbAttr}>${constraintRef}\n<content>${renderedContent}</content>\n</entry>`;
+    })
+    .join('\n\n');
+}
+
+/**
+ * 三块式结构 - 约束定义块
+ * 去重列出本轮所有命中的约束及其作用条目
+ */
+function formatConstraintsBlock(entries: AnalysisEntry[]): string {
+  const collected = collectActiveConstraints(
+    entries.map(ae => ({ entry: ae.entry, worldbookName: ae.worldbookName }))
+  );
+  if (collected.length === 0) return '<no_constraints/>';
+
+  return collected
+    .map(({ constraint, entryNames }) => {
+      const scope = constraint.scope === 'local' ? 'local' : 'global';
+      const type = constraint.type === 'skip' ? 'skip' : 'prompt';
+      return `<constraint name="${constraint.name}" scope="${scope}" type="${type}">\n<instruction>${constraint.instruction}</instruction>\n<bound_entries>${entryNames.join(', ')}</bound_entries>\n</constraint>`;
+    })
+    .join('\n\n');
+}
+
+/** 三块式结构 - 约束优先级说明 */
+function formatConstraintPolicy(): string {
+  return `<priority_rules>
+<rule level="1" priority="critical">输出格式规则：必须输出有效 JSON</rule>
+<rule level="2" priority="critical">数据安全规则：不得丢失未变化的内容</rule>
+<rule level="3" priority="high">局部约束：仅对当前角色卡生效的规则</rule>
+<rule level="4" priority="medium">全局约束：跨角色卡通用规则</rule>
+<rule level="5" priority="low">默认更新原则：分析步骤中的通用判断逻辑</rule>
+</priority_rules>`;
+}
+
 /** 将聊天消息格式化为文本（供宏 {{lore_context}} 使用） */
 function formatChatContext(chatMessages: string[]): string {
-  return chatMessages.join('\n---\n');
+  if (chatMessages.length === 0) return '<no_context/>';
+  if (chatMessages.length === 1) {
+    return `<latest_context>\n${chatMessages[0]}\n</latest_context>`;
+  }
+  const history = chatMessages.slice(0, -1).join('\n');
+  const latest = chatMessages[chatMessages.length - 1];
+  return `<history_context>\n${history}\n</history_context>\n\n<latest_context>\n${latest}\n</latest_context>`;
 }
 
 /**
@@ -244,8 +302,10 @@ function buildUpdatePrompts(
   const source = enabledItems.length > 0 ? enabledItems : BUILTIN_UPDATE_PRESET.filter(p => p.enabled);
   return source.map(p => ({
     role: p.role,
-    // 先替换 Lorevnter 宏，再替换条目宏，最后替换酒馆宏
-    content: resolveLoreMacros(resolveMacros(p.content, allEntries), loreMacros),
+    // 正确顺序：
+    // 1. 先替换 Lorevnter 数据宏（注入 {{lore_entries}} {{lore_context}} 等）
+    // 2. 再替换条目宏（{{macro}} → entry.content）+ 酒馆宏（{{user}} {{char}} 等）
+    content: resolveMacros(resolveLoreMacros(p.content, loreMacros), allEntries),
   } as RolePrompt));
 }
 
@@ -265,10 +325,15 @@ export async function analyzeOnePass(request: AnalysisRequest): Promise<Analysis
 
   // Step 2: 构建宏字典（Lorevnter 专属宏）
   const loreMacros: Record<string, string> = {
+    // 旧宏（兼容）
     lore_worldbook: worldbookText,
     lore_context: contextText,
     lore_max_context: String(settings.lore_ai_max_context),
     lore_entry_count: String(request.entries.length),
+    // 新三块式宏
+    lore_entries: formatEntriesBlock(request.entries),
+    lore_constraints: formatConstraintsBlock(request.entries),
+    lore_constraint_policy: formatConstraintPolicy(),
   };
 
   // Step 3: 构建消息序列（宏在 buildUpdatePrompts 内替换）
@@ -312,17 +377,26 @@ function parseAiResponse(raw: string): AnalysisResult {
       entryName: String(u.entryName || u.name || ''),
       newContent: String(u.newContent || u.content || ''),
       reason: String(u.reason || ''),
+      entryUid: u.entryUid != null ? Number(u.entryUid) : undefined,
     }));
+
+  // 0. 剥离 CoT 思考标签（<lore_think>...</lore_think>）
+  let cleaned = raw;
+  const thinkMatch = cleaned.match(/<lore_think>[\s\S]*?<\/lore_think>/);
+  if (thinkMatch) {
+    logger.debug('已剥离 CoT 思考内容', thinkMatch[0].slice(0, 200));
+    cleaned = cleaned.replace(/<lore_think>[\s\S]*?<\/lore_think>/, '').trim();
+  }
 
   // 1. 最优路径：直接解析
   try {
-    const parsed = JSON.parse(raw.trim());
+    const parsed = JSON.parse(cleaned.trim());
     return { updates: extractUpdates(parsed), rawResponse: raw };
   } catch { /* continue */ }
 
   // 2. markdown 代码块
   try {
-    const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (codeBlockMatch) {
       const parsed = JSON.parse(codeBlockMatch[1].trim());
       return { updates: extractUpdates(parsed), rawResponse: raw };
@@ -331,7 +405,7 @@ function parseAiResponse(raw: string): AnalysisResult {
 
   // 3. 正则提取 JSON 对象
   try {
-    const jsonMatch = raw.match(/(\{[\s\S]*\})/);
+    const jsonMatch = cleaned.match(/(\{[\s\S]*\})/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[1].trim());
       return { updates: extractUpdates(parsed), rawResponse: raw };
@@ -339,7 +413,7 @@ function parseAiResponse(raw: string): AnalysisResult {
   } catch { /* continue */ }
   // 4. 最终回退：宽松匹配
   try {
-    const looseMatch = raw.match(/\{[\s\S]*"updates"[\s\S]*\}/);
+    const looseMatch = cleaned.match(/\{[\s\S]*"updates"[\s\S]*\}/);
     if (looseMatch) {
       const parsed = JSON.parse(looseMatch[0]);
       return { updates: extractUpdates(parsed), rawResponse: raw };
@@ -362,10 +436,15 @@ export function buildOnePassPrompts(request: AnalysisRequest): RolePrompt[] {
   const contextText = formatChatContext(request.chatMessages);
 
   const loreMacros: Record<string, string> = {
+    // 旧宏（兼容）
     lore_worldbook: worldbookText,
     lore_context: contextText,
     lore_max_context: String(settings.lore_ai_max_context),
     lore_entry_count: String(request.entries.length),
+    // 新三块式宏
+    lore_entries: formatEntriesBlock(request.entries),
+    lore_constraints: formatConstraintsBlock(request.entries),
+    lore_constraint_policy: formatConstraintPolicy(),
   };
 
   return buildUpdatePrompts(request.allEntries, loreMacros);

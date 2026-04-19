@@ -84,14 +84,21 @@ export function resetMessageCount(): void {
 
 /**
  * 判断已有条目的变更类型：追加 or 修改
- * - 新内容以原文开头 → append（追加）
- * - 否则 → modify（修改）
+ * - 原文为空 → append
+ * - 新内容包含原文全部内容（按行检测） → append
+ * - 否则 → modify
  */
 function classifyAction(originalContent: string, newContent: string): 'append' | 'modify' {
   const trimOrig = originalContent.trim();
   const trimNew = newContent.trim();
-  if (!trimOrig) return 'append'; // 原文为空视为追加
+  if (!trimOrig) return 'append';
+  // 快速路径：前缀匹配
   if (trimNew.startsWith(trimOrig)) return 'append';
+  // 按行检测：原文的每一行是否都出现在新文中（容忍空白差异）
+  const origLines = trimOrig.split('\n').map(l => l.trim()).filter(Boolean);
+  const newText = trimNew;
+  const allPresent = origLines.every(line => newText.includes(line));
+  if (allPresent && trimNew.length > trimOrig.length) return 'append';
   return 'modify';
 }
 
@@ -112,6 +119,13 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
   if (!settings.lore_plugin_enabled) {
     logger.info('插件已禁用，跳过管线');
     return 'skipped';
+  }
+
+  // ── 刷新上下文（确保世界书列表是最新的） ──
+  try {
+    ctx.refresh();
+  } catch (e) {
+    logger.error('管线启动前刷新上下文失败: ' + (e as Error).message);
   }
 
   // ── 前置校验（running=true 之前，避免锁死） ──
@@ -173,18 +187,28 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
         worldbookMap[wbName] = entries;
         allEntries.push(...entries);
 
+        // 条目处理范围过滤集（当前世界书）
+        const filterUids = settings.lore_entry_filter_map[wbName];
+        const filterUidSet = filterUids ? new Set(filterUids) : null;
+
         for (const entry of entries) {
-          const constraint = getEntryConstraint(entry);
-          // 跳过 skip 类型
+          const constraint = getEntryConstraint(entry, wbName);
+          // 1. 跳过 skip 类型
           if (constraint?.type === 'skip') {
             logger.debug(`跳过条目: ${entry.name} (约束: skip)`);
             continue;
           }
-          // 命中过滤：有缓存时只保留命中的条目
+          // 2. 命中过滤：有缓存时只保留命中的条目
           if (hasCachedNames && !cachedNameSet.has(entry.name)) {
             continue;
           }
-          analysisEntries.push({ entry, constraint });
+          // 3. 条目处理范围过滤
+          if (settings.lore_entry_filter_mode === 'include') {
+            if (!filterUidSet?.has(entry.uid)) continue;
+          } else if (settings.lore_entry_filter_mode === 'exclude') {
+            if (filterUidSet?.has(entry.uid)) continue;
+          }
+          analysisEntries.push({ entry, constraint, worldbookName: wbName });
         }
       } catch (e) {
         logger.error(`加载世界书失败: ${wbName} — ${(e as Error).message}`);
@@ -193,6 +217,8 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
 
     if (analysisEntries.length === 0) {
       toastr.info('没有命中的条目需要分析', 'Lorevnter');
+      runtime.pipelineStatus = 'idle';
+      runtime.pipelineLastMessage = '没有命中的条目';
       return 'no_change';
     }
 
@@ -202,6 +228,8 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
     const chatMessages = getRecentChatMessages(settings.lore_ai_max_context);
     if (chatMessages.length === 0) {
       toastr.warning('聊天记录为空，无法分析', 'Lorevnter');
+      runtime.pipelineStatus = 'failed';
+      runtime.pipelineLastMessage = '聊天记录为空';
       return 'failed';
     }
 
@@ -235,7 +263,7 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
       if (shouldReview) {
         // 审核模式：构造 ReviewUpdate 并打开审核弹窗
         const reviewUpdates: ReviewUpdate[] = result.updates.map(u => {
-          const found = findWorldbookForEntry(u.entryName, worldbookMap);
+          const found = findWorldbookForEntry(u.entryName, worldbookMap, u.entryUid);
           const originalContent = found?.entry.content ?? '';
           return {
             entryName: u.entryName,
@@ -275,16 +303,12 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
                 appliedCount++;
                 logger.info(`已新增: ${update.entryName} → ${targetWb}`);
               } else {
-                // 更新已有条目（append 或 modify 均为写入新内容）
-                const targetWb = findWorldbookForEntry(update.entryName, worldbookMap);
-                if (!targetWb) continue;
-                await updateWorldbookWith(targetWb.worldbookName, (entries) =>
-                  entries.map((e) =>
-                    e.name === update.entryName ? { ...e, content: update.newContent } : e,
-                  ),
-                );
+                // 更新已有条目（通过 uid 精确定位）
+                await WorldbookAPI.updateEntry(update.worldbook, update.uid, {
+                  content: update.newContent,
+                });
                 appliedCount++;
-                logger.info(`已更新: ${update.entryName}`);
+                logger.info(`已更新: ${update.entryName} (uid: ${update.uid})`);
               }
             } catch (e) {
               logger.error(`写入失败: ${update.entryName} — ${(e as Error).message}`);
@@ -302,7 +326,7 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
         // 直接写入模式
         let appliedCount = 0;
         for (const update of result.updates) {
-          const targetWb = findWorldbookForEntry(update.entryName, worldbookMap);
+          const targetWb = findWorldbookForEntry(update.entryName, worldbookMap, update.entryUid);
           try {
             if (!targetWb) {
               // 新增条目
@@ -326,14 +350,12 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
               appliedCount++;
               logger.info(`已新增: ${update.entryName} → ${createWb}`);
             } else {
-              // 更新已有条目
-              await updateWorldbookWith(targetWb.worldbookName, (entries) =>
-                entries.map((e) =>
-                  e.name === update.entryName ? { ...e, content: update.newContent } : e,
-                ),
-              );
+              // 更新已有条目（通过 uid 精确定位）
+              await WorldbookAPI.updateEntry(targetWb.worldbookName, targetWb.entry.uid, {
+                content: update.newContent,
+              });
               appliedCount++;
-              logger.info(`已更新: ${update.entryName} (${update.reason})`);
+              logger.info(`已更新: ${update.entryName} uid:${targetWb.entry.uid} (${update.reason})`);
             }
           } catch (e) {
             logger.error(`写入失败: ${update.entryName} — ${(e as Error).message}`);
@@ -369,25 +391,34 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
 
 // ── 辅助函数 ──
 
-/** 获取最近 N 条聊天消息（集成正文提取规则） */
+/** 获取最近 N 条聊天消息（集成正文提取规则，仅取 AI/char 消息） */
 function getRecentChatMessages(maxCount: number): string[] {
   try {
     const { settings } = useSettingsStore();
-    const msgs = getChatMessages(maxCount);
+
+    // 正确用法：getChatMessages 的参数是楼层号/范围，不是"最近N条"
+    const lastId = getLastMessageId();
+    if (lastId < 0) return [];
+
+    // 多取一些楼层，因为会过滤掉 user 消息
+    const fetchCount = maxCount * 2;
+    const startId = Math.max(0, lastId - fetchCount + 1);
+    const range = `${startId}-${lastId}`;
+    const msgs = getChatMessages(range);
     if (!msgs || msgs.length === 0) return [];
 
     const includeTag = settings.lore_context_include_tag;
     const excludeTags = settings.lore_context_exclude_tags;
 
-    const recent = msgs.slice(-maxCount);
-    return recent
-      .filter((msg) => msg.message && typeof msg.message === 'string')
+    return msgs
+      // 只取 AI/char 消息，不包含用户输入
+      .filter((msg) => msg.role !== 'user' && msg.message && typeof msg.message === 'string')
+      .slice(-maxCount)
       .map((msg) => {
-        const role = msg.role === 'user' ? '{{user}}' : '{{char}}';
         const content = (includeTag || excludeTags)
           ? extractContent(msg.message, includeTag, excludeTags)
           : msg.message;
-        return `${role}: ${content}`;
+        return `{{char}}: ${content}`;
       })
       .filter(msg => msg.trim().length > 5);
   } catch (e) {
@@ -400,7 +431,16 @@ function getRecentChatMessages(maxCount: number): string[] {
 function findWorldbookForEntry(
   entryName: string,
   worldbookMap: Record<string, WorldbookEntry[]>,
+  uid?: number,
 ): { worldbookName: string; entry: WorldbookEntry } | null {
+  // 优先按 uid 精确匹配
+  if (uid != null && uid >= 0) {
+    for (const [wbName, entries] of Object.entries(worldbookMap)) {
+      const entry = entries.find((e) => e.uid === uid);
+      if (entry) return { worldbookName: wbName, entry };
+    }
+  }
+  // 回退：按 name 匹配
   for (const [wbName, entries] of Object.entries(worldbookMap)) {
     const entry = entries.find((e) => e.name === entryName);
     if (entry) return { worldbookName: wbName, entry };
@@ -464,12 +504,21 @@ export async function buildAnalysisRequest(): Promise<AnalysisRequest | null> {
       worldbookMap[wbName] = entries;
       allEntries.push(...entries);
 
+      const filterUids = settings.lore_entry_filter_map[wbName];
+      const filterUidSet = filterUids ? new Set(filterUids) : null;
+
       for (const entry of entries) {
-        const constraint = getEntryConstraint(entry);
+        const constraint = getEntryConstraint(entry, wbName);
         if (constraint?.type === 'skip') continue;
         // 命中过滤
         if (hasCachedNames && !cachedNameSet.has(entry.name)) continue;
-        analysisEntries.push({ entry, constraint });
+        // 条目处理范围过滤
+        if (settings.lore_entry_filter_mode === 'include') {
+          if (!filterUidSet?.has(entry.uid)) continue;
+        } else if (settings.lore_entry_filter_mode === 'exclude') {
+          if (filterUidSet?.has(entry.uid)) continue;
+        }
+        analysisEntries.push({ entry, constraint, worldbookName: wbName });
       }
     } catch {
       // 静默
