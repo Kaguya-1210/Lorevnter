@@ -14,7 +14,7 @@ export const BUILTIN_UPDATE_PRESET: PromptItem[] = [
   {
     id: 'builtin_update_sys',
     role: 'system',
-    name: '[更新] 系统指令',
+    name: '系统指令',
     enabled: true,
     content: `<role>你是 Lorevnter 世界书条目更新引擎。你不是对话参与者，你是一个数据处理管线。</role>
 
@@ -53,9 +53,34 @@ export const BUILTIN_UPDATE_PRESET: PromptItem[] = [
 </output_schema>`,
   },
   {
+    id: 'builtin_update_wb',
+    role: 'user',
+    name: '世界书条目',
+    enabled: true,
+    content: `## 待分析的世界书条目（共 {{lore_entry_count}} 条）
+
+{{lore_worldbook}}`,
+  },
+  {
+    id: 'builtin_update_ctx',
+    role: 'user',
+    name: '上下文正文',
+    enabled: true,
+    content: `## 最近 {{lore_max_context}} 条对话内容
+
+{{lore_context}}`,
+  },
+  {
+    id: 'builtin_update_task',
+    role: 'user',
+    name: '执行指令',
+    enabled: true,
+    content: `请根据上述对话内容，逐条分析世界书条目是否需要更新。严格按照系统指令的规则和输出格式返回 JSON。`,
+  },
+  {
     id: 'builtin_update_ast',
     role: 'assistant',
-    name: '[更新] CoT 锚定',
+    name: 'CoT 锚定',
     enabled: true,
     content: `{"updates": [`,
   },

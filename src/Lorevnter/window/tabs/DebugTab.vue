@@ -203,23 +203,36 @@
       </div>
     </div>
 
-    <!-- 分组 3: 提示词预览 -->
+    <!-- 分组 3: 提示词预览（管线干跑） -->
     <div class="debug-section">
       <div class="debug-section-header" @click="showPromptPreview = !showPromptPreview">
         <span class="debug-section-icon">{{ showPromptPreview ? '▼' : '▶' }}</span>
-        <span class="debug-section-title">提示词预览</span>
-        <button class="debug-action-btn" @click.stop="onBuildPreview" title="生成预览" :disabled="previewLoading">
-          {{ previewLoading ? '⏳' : '🔍' }}
+        <span class="debug-section-title">🔬 管线预览</span>
+        <button class="debug-action-btn" @click.stop="onBuildPreview" title="运行管线预览（不调用AI）" :disabled="previewLoading">
+          {{ previewLoading ? '⏳' : '▶️' }}
         </button>
       </div>
       <div v-if="showPromptPreview" class="debug-section-body">
         <div v-if="!previewPrompts && !previewError" class="debug-empty">
-          点击 🔍 生成预览，查看将发送给 AI 的完整提示词
+          点击 ▶️ 运行管线预览：收集命中条目 → 提取上下文 → 组装提示词（不调用 AI，不写入数据）
         </div>
         <div v-if="previewError" class="debug-empty" style="color: var(--lore-danger);">{{ previewError }}</div>
 
         <template v-if="previewPrompts">
-          <!-- 一次调用模式 -->
+          <!-- 命中条目列表 -->
+          <div class="debug-preview-entries">
+            <div class="debug-key" style="margin-bottom:6px;">📋 命中条目（{{ previewPrompts.entryCount }} 条，跳过 {{ previewPrompts.skippedCount }} 条）</div>
+            <div v-for="(name, i) in previewPrompts.entryNames" :key="i" class="debug-cache-name-item">
+              {{ name }}
+            </div>
+            <div class="debug-kv-item" style="margin-top:6px;">
+              <span class="debug-key">上下文消息</span>
+              <span class="debug-value">{{ previewPrompts.messageCount }} 条</span>
+            </div>
+          </div>
+
+          <!-- 提示词卡片 -->
+          <div class="debug-key" style="margin-top:12px;margin-bottom:6px;">📝 最终提示词（{{ previewPrompts.onepass.length }} 条消息）</div>
           <template v-if="previewPrompts.mode === 'onepass'">
             <div v-for="(p, i) in previewPrompts.onepass" :key="i" class="debug-prompt-card" :class="'debug-prompt-' + p.role">
               <div class="debug-prompt-role" :class="'debug-prompt-role-' + p.role">{{ p.role.toUpperCase() }}</div>
@@ -515,8 +528,15 @@ const aiHistoryReversed = computed(() =>
   runtime.aiCallHistory.slice().reverse(),
 );
 
-// ── 提示词预览 ──
-interface PromptPreviewData { mode: 'onepass'; onepass: RolePrompt[] }
+// ── 管线预览（干跑） ──
+interface PromptPreviewData {
+  mode: 'onepass';
+  onepass: RolePrompt[];
+  entryNames: string[];
+  entryCount: number;
+  skippedCount: number;
+  messageCount: number;
+}
 
 const previewPrompts = ref<PromptPreviewData | null>(null);
 const previewLoading = ref(false);
@@ -535,9 +555,22 @@ async function onBuildPreview() {
     }
 
     const prompts = buildOnePassPrompts(request);
-    previewPrompts.value = { mode: 'onepass', onepass: prompts };
 
-    toastr.success('提示词预览已生成', 'Lorevnter');
+    // 统计条目信息
+    const entryNames = request.entries.map(ae => ae.entry.name || `uid_${ae.entry.uid}`);
+    const totalEntries = Object.values(request.worldbookMap).reduce((sum, arr) => sum + arr.length, 0);
+    const skippedCount = totalEntries - request.entries.length;
+
+    previewPrompts.value = {
+      mode: 'onepass',
+      onepass: prompts,
+      entryNames,
+      entryCount: request.entries.length,
+      skippedCount,
+      messageCount: request.chatMessages.length,
+    };
+
+    toastr.success(`管线预览完成：${request.entries.length} 条目, ${request.chatMessages.length} 消息`, 'Lorevnter');
   } catch (e) {
     previewError.value = `构建失败: ${(e as Error).message}`;
   } finally {

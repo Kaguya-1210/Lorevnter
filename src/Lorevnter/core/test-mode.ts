@@ -25,7 +25,7 @@ interface TestSnapshot {
 
 /** 单条测试操作的结果 */
 export interface TestActionResult {
-  action: 'modify' | 'create';
+  action: 'modify' | 'append' | 'create';
   entryName: string;
   uid: number | string;
   success: boolean;
@@ -200,7 +200,7 @@ export async function runTestWrite(worldbookName: string): Promise<{
                 content: update.newContent,
               });
               actions.push({
-                action: 'modify',
+                action: update.action === 'append' ? 'append' : 'modify',
                 entryName: update.entryName,
                 uid: update.uid,
                 success: true,
@@ -210,7 +210,7 @@ export async function runTestWrite(worldbookName: string): Promise<{
             }
           } catch (e) {
             actions.push({
-              action: update.action === 'create' ? 'create' : 'modify',
+              action: update.action,
               entryName: update.entryName,
               uid: update.uid,
               success: false,

@@ -530,16 +530,16 @@ export function openReviewEditor(
         if (approved.length === 0) return;
         close();
         onExecute(approved);
-        const runtime1 = useRuntimeStore().runtime;
-        runtime1.pipelineStatus = 'done';
-        runtime1.pipelineLastMessage = `已写入 ${approved.length} 条`;
+        const store1 = useRuntimeStore();
+        store1.pipelineStatus = 'done';
+        store1.pipelineLastMessage = `已写入 ${approved.length} 条`;
         break;
       }
       case 'cancel': {
         close();
-        const runtime2 = useRuntimeStore().runtime;
-        runtime2.pipelineStatus = 'idle';
-        runtime2.pipelineLastMessage = '用户取消审核';
+        const store2 = useRuntimeStore();
+        store2.pipelineStatus = 'idle';
+        store2.pipelineLastMessage = '用户取消审核';
         if (onCancel) onCancel();
         break;
       }

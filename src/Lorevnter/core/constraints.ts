@@ -196,3 +196,18 @@ export function resolveMacros(template: string, allEntries: WorldbookEntry[]): s
 
   return result;
 }
+
+/**
+ * 解析 Lorevnter 专属数据宏
+ * {{lore_worldbook}} → 命中的世界书条目文本
+ * {{lore_context}}   → 上下文正文
+ * {{lore_max_context}} → 上下文数量设置值
+ * {{lore_entry_count}} → 分析条目数量
+ */
+export function resolveLoreMacros(template: string, macros: Record<string, string>): string {
+  let result = template;
+  for (const [key, value] of Object.entries(macros)) {
+    result = result.replaceAll(`{{${key}}}`, value);
+  }
+  return result;
+}

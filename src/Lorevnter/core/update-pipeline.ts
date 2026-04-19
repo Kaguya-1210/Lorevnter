@@ -123,7 +123,7 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
   const worldbookNames = ctx.getActiveWorldbookNames();
   if (worldbookNames.length === 0) {
     toastr.warning('无活跃的世界书', 'Lorevnter');
-    return;
+    return 'failed';
   }
 
   running = true;
@@ -133,6 +133,17 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
   toastr.info('开始分析剧情变化...', 'Lorevnter');
   logger.info('管线启动');
 
+  // 超时保护：120s 后自动恢复，防止管线卡死
+  const pipelineTimeout = setTimeout(() => {
+    if (running) {
+      running = false;
+      runtime.pipelineStatus = 'failed';
+      runtime.pipelineLastMessage = '管线超时（120s），已自动恢复';
+      logger.error('管线超时，强制重置');
+      toastr.error('AI 分析超时，已自动恢复', 'Lorevnter');
+    }
+  }, 120_000);
+
   try {
     // Step 1: 收集世界书名称
     logger.info(`活跃世界书: ${worldbookNames.join(', ')}`);
@@ -140,10 +151,21 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
     // Step 1.5: 自动备份（AI 分析前快照）
     await autoBackupIfNeeded(worldbookNames);
 
-    // Step 2: 加载所有条目
+    // Step 2: 加载条目 + 命中过滤
     const allEntries: WorldbookEntry[] = [];
     const worldbookMap: Record<string, WorldbookEntry[]> = {};
     const analysisEntries: AnalysisEntry[] = [];
+
+    // 获取酒馆命中的条目名（scan-cache 缓存）
+    const cachedNames = getCachedEntryNames();
+    const hasCachedNames = cachedNames.length > 0;
+    const cachedNameSet = new Set(cachedNames);
+
+    if (hasCachedNames) {
+      logger.info(`使用命中缓存过滤: ${cachedNames.length} 条命中条目`);
+    } else {
+      logger.warn('无命中缓存，将分析全部条目（首次运行或缓存已清空）');
+    }
 
     for (const wbName of worldbookNames) {
       try {
@@ -158,6 +180,10 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
             logger.debug(`跳过条目: ${entry.name} (约束: skip)`);
             continue;
           }
+          // 命中过滤：有缓存时只保留命中的条目
+          if (hasCachedNames && !cachedNameSet.has(entry.name)) {
+            continue;
+          }
           analysisEntries.push({ entry, constraint });
         }
       } catch (e) {
@@ -166,7 +192,7 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
     }
 
     if (analysisEntries.length === 0) {
-      toastr.info('没有需要分析的条目（全部被跳过或无条目）', 'Lorevnter');
+      toastr.info('没有命中的条目需要分析', 'Lorevnter');
       return 'no_change';
     }
 
@@ -203,7 +229,10 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
       // 确定新增条目的目标世界书
       const defaultCreateWb = settings.lore_new_entry_default_worldbook || worldbookNames[0] || '';
 
-      if (settings.lore_review_enabled) {
+      // 审核分流：调试模式强制审核，非调试模式看 review_enabled
+      const shouldReview = settings.lore_debug_mode || settings.lore_review_enabled;
+
+      if (shouldReview) {
         // 审核模式：构造 ReviewUpdate 并打开审核弹窗
         const reviewUpdates: ReviewUpdate[] = result.updates.map(u => {
           const found = findWorldbookForEntry(u.entryName, worldbookMap);
@@ -333,6 +362,7 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
     runtime.pipelineLastMessage = (e as Error).message;
     return 'failed';
   } finally {
+    clearTimeout(pipelineTimeout);
     running = false;
   }
 }
@@ -423,6 +453,11 @@ export async function buildAnalysisRequest(): Promise<AnalysisRequest | null> {
   const worldbookMap: Record<string, WorldbookEntry[]> = {};
   const analysisEntries: AnalysisEntry[] = [];
 
+  // 获取酒馆命中的条目名（scan-cache 缓存）
+  const cachedNames = getCachedEntryNames();
+  const hasCachedNames = cachedNames.length > 0;
+  const cachedNameSet = new Set(cachedNames);
+
   for (const wbName of worldbookNames) {
     try {
       const entries = await WorldbookAPI.fetch(wbName);
@@ -432,6 +467,8 @@ export async function buildAnalysisRequest(): Promise<AnalysisRequest | null> {
       for (const entry of entries) {
         const constraint = getEntryConstraint(entry);
         if (constraint?.type === 'skip') continue;
+        // 命中过滤
+        if (hasCachedNames && !cachedNameSet.has(entry.name)) continue;
         analysisEntries.push({ entry, constraint });
       }
     } catch {

@@ -86,12 +86,19 @@
     <div class="st-group">
       <div class="st-group-title">功能开关</div>
 
-      <label class="st-row">
+      <label class="st-row" v-if="!settings.lore_debug_mode">
         <div class="st-row-main">
           <span class="st-label">修改审核</span>
           <input type="checkbox" v-model="settings.lore_review_enabled" class="ios-toggle" />
         </div>
-        <span class="st-hint">AI 分析完成后弹出审核弹窗，逐条确认修改</span>
+        <span class="st-hint">AI 分析完成后弹出审核弹窗，逐条确认修改（调试模式下强制开启）</span>
+      </label>
+      <label class="st-row" v-if="settings.lore_debug_mode">
+        <div class="st-row-main">
+          <span class="st-label">修改审核</span>
+          <input type="checkbox" checked disabled class="ios-toggle" />
+        </div>
+        <span class="st-hint">🔍 调试模式下审核强制开启</span>
       </label>
 
       <label class="st-row">

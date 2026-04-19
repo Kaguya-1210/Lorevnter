@@ -270,3 +270,25 @@
 
 /* --- 空状态 --- */
 .st-empty { font-size: 13px; color: var(--lore-text-secondary); text-align: center; padding: 10px 0; }
+
+/* --- 公共操作按钮（跨组件共享） --- */
+.debug-action-btn {
+  background: var(--lore-bg-primary); border: none; font-size: 14px; cursor: pointer;
+  padding: 4px 6px; border-radius: var(--lore-radius-sm); transition: background 0.15s;
+  min-width: 32px; min-height: 32px;
+  display: flex; align-items: center; justify-content: center;
+}
+.debug-action-btn:hover { background: var(--lore-border-light); }
+.debug-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.debug-action-btn-full {
+  width: 100%; padding: 10px 14px; border: 1px solid var(--lore-accent);
+  border-radius: var(--lore-radius-sm); background: var(--lore-accent-bg);
+  color: var(--lore-accent); font-size: 13px; font-weight: 500;
+  cursor: pointer; min-height: 44px;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.debug-action-btn-full:hover {
+  background: var(--lore-accent); color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}

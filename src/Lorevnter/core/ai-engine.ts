@@ -5,7 +5,7 @@
 
 import { createLogger } from '../logger';
 import { useSettingsStore } from '../settings';
-import { getEntryMacro, resolveMacros } from './constraints';
+import { getEntryMacro, resolveMacros, resolveLoreMacros } from './constraints';
 import type { LoreConstraint } from '../settings';
 
 const logger = createLogger('ai-engine');
@@ -138,24 +138,24 @@ export async function testApiConnection(): Promise<{ ok: boolean; message: strin
     const caller = buildApiCaller();
     const result = await caller({
       ordered_prompts: [
-        { role: 'user', content: 'Hello, respond with "ok".' } as RolePrompt,
+        { role: 'user', content: 'Respond with exactly one word: "ok"' } as RolePrompt,
       ],
     });
 
     if (!result || result.trim().length === 0) {
-      return { ok: false, message: '响应为空' };
+      return { ok: false, message: '响应为空，请检查 API 配置' };
     }
 
-    // 检测 API 错误标记（酒馆助手返回错误时通常以 [API Error] 开头）
-    const errorPatterns = ['[API Error]', '[Error]', 'error', '401', '403', '404', '500'];
-    const lower = result.toLowerCase();
+    // 检测 API 错误标记（酒馆返回错误时包含这些标记）
+    const errorPatterns = ['[API Error]', '[Error]', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', '401', '403', '404', '500', '502', '503'];
+    const resultText = result.trim();
     for (const pattern of errorPatterns) {
-      if (lower.startsWith(pattern.toLowerCase())) {
-        return { ok: false, message: `API 返回错误: ${result.slice(0, 80)}` };
+      if (resultText.includes(pattern)) {
+        return { ok: false, message: `API 错误: ${resultText.slice(0, 120)}` };
       }
     }
 
-    return { ok: true, message: `连接成功 (${result.slice(0, 30).trim()}...)` };
+    return { ok: true, message: `连接成功 (${resultText.slice(0, 40).trim()})` };
   } catch (e) {
     return { ok: false, message: (e as Error).message };
   }
@@ -209,18 +209,43 @@ function concatPrefill(prefill: string, rawResponse: string): string {
 
 import { getActivePreset, BUILTIN_UPDATE_PRESET } from './prompt-editor';
 
+// ── 数据提取 ──
+
+/** 将分析条目格式化为文本（供宏 {{lore_worldbook}} 使用） */
+function formatWorldbookEntries(entries: AnalysisEntry[], allEntries: WorldbookEntry[]): string {
+  return entries
+    .map((ae) => {
+      const constraintText = ae.constraint
+        ? `\n  约束: ${resolveMacros(ae.constraint.instruction, allEntries)}`
+        : '';
+      const macroText = getEntryMacro(ae.entry) ? ` (宏: {{${getEntryMacro(ae.entry)}}})` : '';
+      return `- ${ae.entry.name}${macroText}:${constraintText}\n  当前内容: ${ae.entry.content}`;
+    })
+    .join('\n\n');
+}
+
+/** 将聊天消息格式化为文本（供宏 {{lore_context}} 使用） */
+function formatChatContext(chatMessages: string[]): string {
+  return chatMessages.join('\n---\n');
+}
+
 /**
  * 构建更新阶段的 ordered_prompts。
  * 从当前激活预设的 update_items 读取，回退到内置。
+ * 通过宏系统填充数据：{{lore_worldbook}}、{{lore_context}} 等。
  */
-function buildUpdatePrompts(allEntries: WorldbookEntry[]): RolePrompt[] {
+function buildUpdatePrompts(
+  allEntries: WorldbookEntry[],
+  loreMacros: Record<string, string>,
+): RolePrompt[] {
   const preset = getActivePreset();
   const enabledItems = preset.update_items.filter(p => p.enabled);
 
   const source = enabledItems.length > 0 ? enabledItems : BUILTIN_UPDATE_PRESET.filter(p => p.enabled);
   return source.map(p => ({
     role: p.role,
-    content: resolveMacros(p.content, allEntries),
+    // 先替换 Lorevnter 宏，再替换条目宏，最后替换酒馆宏
+    content: resolveLoreMacros(resolveMacros(p.content, allEntries), loreMacros),
   } as RolePrompt));
 }
 
@@ -231,28 +256,23 @@ function buildUpdatePrompts(allEntries: WorldbookEntry[]): RolePrompt[] {
 /** 一次调用模式：筛选 + 更新合一 */
 export async function analyzeOnePass(request: AnalysisRequest): Promise<AnalysisResult> {
   const callApi = buildApiCaller();
+  const { settings } = useSettingsStore();
   logger.info(`一次调用模式: ${request.entries.length} 个条目, ${request.chatMessages.length} 条消息`);
 
-  // 构建条目描述
-  const entriesText = request.entries
-    .map((ae) => {
-      const constraintText = ae.constraint
-        ? `\n  约束: ${resolveMacros(ae.constraint.instruction, request.allEntries)}`
-        : '';
-      const macroText = getEntryMacro(ae.entry) ? ` (宏: {{${getEntryMacro(ae.entry)}}})` : '';
-      return `- ${ae.entry.name}${macroText}:${constraintText}\n  当前内容: ${ae.entry.content}`;
-    })
-    .join('\n\n');
+  // Step 1: 提取数据
+  const worldbookText = formatWorldbookEntries(request.entries, request.allEntries);
+  const contextText = formatChatContext(request.chatMessages);
 
-  const chatText = request.chatMessages.join('\n---\n');
-  const userPrompt = `## 世界书条目\n${entriesText}\n\n## 最近的对话内容\n${chatText}`;
+  // Step 2: 构建宏字典（Lorevnter 专属宏）
+  const loreMacros: Record<string, string> = {
+    lore_worldbook: worldbookText,
+    lore_context: contextText,
+    lore_max_context: String(settings.lore_ai_max_context),
+    lore_entry_count: String(request.entries.length),
+  };
 
-  // 构建消息序列（含内置预设回退）
-  const updatePrompts = buildUpdatePrompts(request.allEntries);
-  const ordered_prompts: RolePrompt[] = [
-    ...updatePrompts,
-    { role: 'user', content: userPrompt } as RolePrompt,
-  ];
+  // Step 3: 构建消息序列（宏在 buildUpdatePrompts 内替换）
+  const ordered_prompts = buildUpdatePrompts(request.allEntries, loreMacros);
 
   toastr.info('AI 正在分析...', 'Lorevnter');
 
@@ -337,23 +357,17 @@ function parseAiResponse(raw: string): AnalysisResult {
 
 /** 组装一次调用模式的 prompt（用于调试预览） */
 export function buildOnePassPrompts(request: AnalysisRequest): RolePrompt[] {
-  const entriesText = request.entries
-    .map((ae) => {
-      const constraintText = ae.constraint
-        ? `\n  约束: ${resolveMacros(ae.constraint.instruction, request.allEntries)}`
-        : '';
-      const macroText = getEntryMacro(ae.entry) ? ` (宏: {{${getEntryMacro(ae.entry)}}})` : '';
-      return `- ${ae.entry.name}${macroText}:${constraintText}\n  当前内容: ${ae.entry.content}`;
-    })
-    .join('\n\n');
+  const { settings } = useSettingsStore();
+  const worldbookText = formatWorldbookEntries(request.entries, request.allEntries);
+  const contextText = formatChatContext(request.chatMessages);
 
-  const chatText = request.chatMessages.join('\n---\n');
-  const userPrompt = `## 世界书条目\n${entriesText}\n\n## 最近的对话内容\n${chatText}`;
+  const loreMacros: Record<string, string> = {
+    lore_worldbook: worldbookText,
+    lore_context: contextText,
+    lore_max_context: String(settings.lore_ai_max_context),
+    lore_entry_count: String(request.entries.length),
+  };
 
-  const updateMsgs = buildUpdatePrompts(request.allEntries);
-  return [
-    ...updateMsgs,
-    { role: 'user', content: userPrompt } as RolePrompt,
-  ];
+  return buildUpdatePrompts(request.allEntries, loreMacros);
 }
 
