@@ -1,6 +1,6 @@
 // ============================================================
 // Lorevnter - WORLDINFO_SCAN_DONE 缓存管理
-// 累积激活条目标识（worldbook.uid），去重，持久化，过期提醒
+// 缓存当前激活条目标识（worldbook.uid），持久化，过期清理
 // ============================================================
 
 import { createLogger } from '../logger';
@@ -11,8 +11,17 @@ const logger = createLogger('scan-cache');
 /** 3 天过期阈值（毫秒） */
 const STALE_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
 
+/** 缓存最大保留聊天数（超出时清理最旧的） */
+const MAX_CACHED_CHATS = 20;
+
 // ── 运行时 chatId ──
 let currentChatId: string | null = null;
+
+/**
+ * 分析后冷却时间戳：在此时间之前 onScanDone 不会写入缓存。
+ * 解决"clearCacheAfterAnalysis 刚清完，SCAN_DONE 立刻重新填充"的问题。
+ */
+let suppressUntil = 0;
 
 const CACHE_KEY_PATTERN = /.+\.\d+$/;
 
@@ -45,12 +54,15 @@ function formatCacheLabel(cacheKey: string): string {
 /** 设置当前聊天 ID（从 index.ts 调用） */
 export function setCacheChatId(chatId: string): void {
   currentChatId = chatId;
+
+  // 切换聊天时清理孤儿缓存（保留最多 MAX_CACHED_CHATS 个）
+  pruneOldCaches();
 }
 
 /**
  * 处理 WORLDINFO_SCAN_DONE 事件。
  * 从 activated.entries Map 中提取条目标识（worldbook.uid），
- * 去重后合并到当前 chatId 的缓存中。
+ * 直接覆盖当前 chatId 的缓存。
  */
 export function onScanDone(eventData: {
   activated: {
@@ -59,6 +71,12 @@ export function onScanDone(eventData: {
 }): void {
   if (!currentChatId) {
     logger.debug('SCAN_DONE: 无 chatId，跳过缓存');
+    return;
+  }
+
+  // 分析后冷却期内不更新缓存
+  if (Date.now() < suppressUntil) {
+    logger.debug('SCAN_DONE: 冷却期内，跳过缓存更新');
     return;
   }
 
@@ -99,7 +117,9 @@ export function onScanDone(eventData: {
   settings.lore_scan_cache[currentChatId] = finalArray;
   settings.lore_scan_cache_timestamps[currentChatId] = Date.now();
 
-  logger.info(`SCAN_DONE: 缓存已覆盖 (${prevCount} → ${finalArray.length} 条, chatId: ${currentChatId})`);
+  if (prevCount !== finalArray.length) {
+    logger.info(`SCAN_DONE: 缓存已覆盖 (${prevCount} → ${finalArray.length} 条)`);
+  }
 }
 
 /** 获取当前 chatId 的缓存条目标识列表（worldbook.uid） */
@@ -115,7 +135,10 @@ export function getCachedEntryLabels(): string[] {
   return getCachedEntryKeys().map(formatCacheLabel);
 }
 
-/** 分析完成后清空当前 chatId 缓存（若设置为 after_analysis） */
+/**
+ * 分析完成后清空当前 chatId 缓存（若设置为 after_analysis）。
+ * 同时设置 3 秒冷却，防止 SCAN_DONE 立刻重新填充。
+ */
 export function clearCacheAfterAnalysis(): void {
   if (!currentChatId) return;
 
@@ -124,7 +147,11 @@ export function clearCacheAfterAnalysis(): void {
 
   delete settings.lore_scan_cache[currentChatId];
   delete settings.lore_scan_cache_timestamps[currentChatId];
-  logger.info(`分析后缓存已清空 (chatId: ${currentChatId})`);
+
+  // 设置 3 秒冷却：在此期间 onScanDone 不会写入缓存
+  suppressUntil = Date.now() + 3000;
+
+  logger.info(`分析后缓存已清空 (chatId: ${currentChatId})，3s 内抑制 SCAN_DONE`);
 }
 
 /** 手动清空指定 chatId 的缓存 */
@@ -157,6 +184,49 @@ export function getStaleChats(): string[] {
   return stale;
 }
 
+/**
+ * 清理孤儿缓存：保留最多 MAX_CACHED_CHATS 个，淘汰最旧的。
+ * 同时清理空缓存和缺失 timestamp 的记录。
+ */
+function pruneOldCaches(): void {
+  const { settings } = useSettingsStore();
+
+  // 1. 清理空缓存数组和残留 timestamps
+  for (const chatId of Object.keys(settings.lore_scan_cache)) {
+    if (!settings.lore_scan_cache[chatId]?.length) {
+      delete settings.lore_scan_cache[chatId];
+      delete settings.lore_scan_cache_timestamps[chatId];
+    }
+  }
+  // 清理没有对应缓存数据的 timestamps
+  for (const chatId of Object.keys(settings.lore_scan_cache_timestamps)) {
+    if (!settings.lore_scan_cache[chatId]?.length) {
+      delete settings.lore_scan_cache_timestamps[chatId];
+    }
+  }
+
+  // 2. 超出上限时淘汰最旧的
+  const chatIds = Object.keys(settings.lore_scan_cache);
+  if (chatIds.length <= MAX_CACHED_CHATS) return;
+
+  // 按 timestamp 升序排列（最旧在前）
+  const sorted = chatIds
+    .map(id => ({ id, ts: settings.lore_scan_cache_timestamps[id] ?? 0 }))
+    .sort((a, b) => a.ts - b.ts);
+
+  const toRemove = sorted.slice(0, sorted.length - MAX_CACHED_CHATS);
+  for (const { id } of toRemove) {
+    // 不删当前聊天
+    if (id === currentChatId) continue;
+    delete settings.lore_scan_cache[id];
+    delete settings.lore_scan_cache_timestamps[id];
+  }
+
+  if (toRemove.length > 0) {
+    logger.info(`缓存清理: 淘汰 ${toRemove.length} 个旧聊天缓存，保留 ${MAX_CACHED_CHATS} 个`);
+  }
+}
+
 /** 获取当前 chatId */
 export function getCurrentCacheChatId(): string | null {
   return currentChatId;
@@ -172,7 +242,10 @@ export function getCacheStats(): {
   const currentCount = currentChatId
     ? getCurrentChatCache(settings).length
     : 0;
-  const totalChats = Object.keys(settings.lore_scan_cache).length;
+  // 只统计有实际缓存数据的聊天
+  const totalChats = Object.keys(settings.lore_scan_cache).filter(
+    id => (settings.lore_scan_cache[id]?.length ?? 0) > 0,
+  ).length;
 
   return { chatId: currentChatId, currentCount, totalChats };
 }
