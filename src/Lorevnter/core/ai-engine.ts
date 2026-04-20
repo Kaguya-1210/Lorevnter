@@ -4,9 +4,10 @@
 // ============================================================
 
 import { createLogger } from '../logger';
-import { useSettingsStore } from '../settings';
-import { getEntryMacro, getEntryConstraints, collectActiveConstraints, resolveMacros, resolveLoreMacros } from './constraints';
-import type { LoreConstraint } from '../settings';
+import { useSettingsStore, type PromptItem, type LoreConstraint } from '../settings';
+import { getEntryMacro, getEntryConstraints, collectActiveConstraints, resolveMacros, resolveLoreMacros, getConstraintById } from './constraints';
+import { getUserPersona } from './persona';
+import { useContextStore } from './worldbook-context';
 
 const logger = createLogger('ai-engine');
 
@@ -14,6 +15,180 @@ const logger = createLogger('ai-engine');
 
 interface ApiCallerOptions {
   ordered_prompts: RolePrompt[];
+}
+
+function buildPersonaMacroValue(): string {
+  const { settings } = useSettingsStore();
+  if (!settings.lore_include_persona) return '';
+
+  const persona = getUserPersona();
+  if (!persona) return '';
+
+  let personaBlock = persona;
+  if (settings.lore_persona_constraint_id) {
+    const pc = getConstraintById(settings.lore_persona_constraint_id);
+    const currentCharacterScopeKey = useContextStore().context.characterScopeKey ?? '';
+    const scopeMatches = pc?.scope !== 'local'
+      || !settings.lore_persona_constraint_character_id
+      || settings.lore_persona_constraint_character_id === currentCharacterScopeKey;
+    if (pc && pc.enabled && pc.instruction && scopeMatches) {
+      personaBlock += `\n<persona_constraint name="${pc.name}">\n${pc.instruction}\n</persona_constraint>`;
+    }
+  }
+
+  return personaBlock;
+}
+
+function buildLoreMacros(request: AnalysisRequest): Record<string, string> {
+  const { settings } = useSettingsStore();
+
+  return {
+    lore_worldbook: formatWorldbookEntries(request.entries, request.allEntries),
+    lore_context: formatChatContext(request.chatMessages),
+    lore_max_context: String(settings.lore_ai_max_context),
+    lore_entry_count: String(request.entries.length),
+    lore_entries: formatEntriesBlock(request.entries),
+    lore_constraints: formatConstraintsBlock(request.entries),
+    lore_constraint_policy: formatConstraintPolicy(),
+    lore_user_persona: buildPersonaMacroValue(),
+  };
+}
+
+function parseCandidateUpdates(raw: string): UpdateInstruction[] {
+  const normalizeUpdates = (parsed: unknown): UpdateInstruction[] => {
+    const result = RawResponseSchema.safeParse(parsed);
+    if (!result.success) return [];
+    return result.data.updates.map((u) => ({
+      entryName: String(u.entryName ?? u.name ?? ''),
+      newContent: String(u.newContent ?? u.content ?? ''),
+      reason: String(u.reason ?? ''),
+      think: String(u.think ?? ''),
+      entryUid: u.entryUid != null && Number.isFinite(Number(u.entryUid)) ? Number(u.entryUid) : undefined,
+    }));
+  };
+
+  let cleaned = raw;
+  const thinkMatch = cleaned.match(/<lore_think>[\s\S]*?<\/lore_think>/);
+  if (thinkMatch) {
+    logger.debug('AI 响应包含旧版 <lore_think>，已在解析前剥离');
+    cleaned = cleaned.replace(/<lore_think>[\s\S]*?<\/lore_think>/, '').trim();
+  }
+
+  const candidates: string[] = [
+    cleaned.trim(),
+    cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() ?? '',
+    cleaned.match(/(\{[\s\S]*\})/)?.[1]?.trim() ?? '',
+    cleaned.match(/\{[\s\S]*"updates"[\s\S]*\}/)?.[0]?.trim() ?? '',
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      return normalizeUpdates(JSON.parse(candidate));
+    } catch {
+      // continue
+    }
+  }
+
+  return [];
+}
+
+function parsePublicThink(raw: string): string {
+  let cleaned = raw;
+  const thinkMatch = cleaned.match(/<lore_think>[\s\S]*?<\/lore_think>/);
+  if (thinkMatch) {
+    cleaned = cleaned.replace(/<lore_think>[\s\S]*?<\/lore_think>/, '').trim();
+  }
+
+  const candidates: string[] = [
+    cleaned.trim(),
+    cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() ?? '',
+    cleaned.match(/(\{[\s\S]*\})/)?.[1]?.trim() ?? '',
+    cleaned.match(/\{[\s\S]*"updates"[\s\S]*\}/)?.[0]?.trim() ?? '',
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      const result = RawResponseSchema.safeParse(parsed);
+      if (!result.success) continue;
+      return String(result.data.think ?? '').trim();
+    } catch {
+      // continue
+    }
+  }
+
+  return '';
+}
+
+function sanitizeAnalysisResult(request: AnalysisRequest, rawUpdates: UpdateInstruction[]): UpdateInstruction[] {
+  const { settings } = useSettingsStore();
+  const entriesByName = new Map<string, AnalysisEntry[]>();
+  const existingNames = new Set(request.allEntries.map(entry => (entry.name || '').trim()).filter(Boolean));
+
+  for (const analysisEntry of request.entries) {
+    const key = analysisEntry.entry.name.trim();
+    if (!key) continue;
+    const list = entriesByName.get(key) ?? [];
+    list.push(analysisEntry);
+    entriesByName.set(key, list);
+  }
+
+  const sanitized: UpdateInstruction[] = [];
+  const seenTargets = new Set<string>();
+
+  for (const update of rawUpdates) {
+    const entryName = update.entryName.trim();
+    const newContent = update.newContent.trim();
+    const reason = update.reason.trim() || 'AI 未提供理由';
+    const numericUid = update.entryUid != null && Number.isFinite(update.entryUid) ? update.entryUid : undefined;
+    const think = update.think?.trim() || '';
+
+    if (!entryName || !newContent) continue;
+
+    if (entryName === '__persona__') {
+      if (!settings.lore_include_persona) continue;
+      const currentPersona = (getUserPersona() ?? '').trim();
+      if (currentPersona === newContent) continue;
+      if (seenTargets.has('persona')) continue;
+      seenTargets.add('persona');
+      sanitized.push({ entryName, entryUid: -1, newContent, reason, think });
+      continue;
+    }
+
+    let matchedEntry: AnalysisEntry | null = null;
+    if (numericUid != null && numericUid >= 0) {
+      matchedEntry = request.entries.find(ae => ae.entry.uid === numericUid) ?? null;
+    }
+
+    if (!matchedEntry) {
+      const sameNameEntries = entriesByName.get(entryName) ?? [];
+      if (sameNameEntries.length > 1) continue;
+      matchedEntry = sameNameEntries[0] ?? null;
+    }
+
+    if (matchedEntry) {
+      if (matchedEntry.entry.content.trim() === newContent) continue;
+      const targetKey = `entry:${matchedEntry.entry.uid}`;
+      if (seenTargets.has(targetKey)) continue;
+      seenTargets.add(targetKey);
+      sanitized.push({
+        entryName: matchedEntry.entry.name,
+        entryUid: matchedEntry.entry.uid,
+        newContent,
+        reason,
+        think,
+      });
+      continue;
+    }
+
+    if (existingNames.has(entryName)) continue;
+    const targetKey = `create:${entryName}`;
+    if (seenTargets.has(targetKey)) continue;
+    seenTargets.add(targetKey);
+    sanitized.push({ entryName, newContent, reason, think });
+  }
+
+  return sanitized;
 }
 
 /**
@@ -185,6 +360,7 @@ export interface UpdateInstruction {
   entryName: string;
   newContent: string;
   reason: string;
+  think?: string;
   /** 条目 uid（AI 返回时可能包含，用于精确定位） */
   entryUid?: number;
 }
@@ -192,7 +368,119 @@ export interface UpdateInstruction {
 export interface AnalysisResult {
   updates: UpdateInstruction[];
   rawResponse: string;
+  think?: string;
 }
+
+const SAFE_UPDATE_PROMPT_ITEMS: PromptItem[] = [
+  {
+    id: 'builtin_safe_update_sys',
+    role: 'system',
+    name: '系统规则',
+    enabled: true,
+    content: `<role>你是 Lorevnter 的世界书更新引擎，负责基于聊天正文中的证据提出精确、可执行的条目更新。</role>
+
+<constraints>
+{{lore_constraints}}
+</constraints>
+
+<constraint_priority>
+{{lore_constraint_policy}}
+</constraint_priority>
+
+<decision_rules>
+1. 约束规则拥有最高优先级——当约束要求记录能力值、数据、关系等信息时，必须执行，即使默认规则建议跳过。
+2. 有约束的条目：严格按约束指令更新，约束说"自由扩展"就自由扩展，约束说"记录数值"就记录数值。
+3. 无约束的条目：仅在出现明确新事实、状态变化、关系变化，或能将模糊表述精确化时，才更新。
+4. 如果证据不足或只是措辞差异，不更新（此规则不适用于有约束的条目——约束已明确指定更新策略）。
+5. 优先更新已有条目；只有当稳定新概念无法合理归入任何已有条目时，才创建新条目。
+6. newContent 必须是完整替换文本，保留所有仍然成立的原有信息。
+7. 保持原条目的格式、结构和文风。
+</decision_rules>
+
+<output_rules>
+1. 只能输出 JSON 对象，不要输出解释、前言、代码块或思考过程。
+2. updates 中每一项都必须包含 entryName、newContent、reason。
+3. 更新已有条目时必须填写 entryUid。
+4. 更新用户人设时 entryName 必须是 "__persona__"，entryUid 必须是 -1。
+5. 没有需要更新的条目时，返回 {"updates":[] }。
+</output_rules>`,
+  },
+  {
+    id: 'builtin_safe_update_task',
+    role: 'user',
+    name: '安全任务说明',
+    enabled: true,
+    content: `<task>
+请检查聊天上下文、世界书条目、约束规则和用户人设，输出需要更新的项目。
+
+重点要求：
+- 只根据当前输入中的证据判断，不要脑补。
+- 如果更新无法安全定位到唯一目标，就不要输出它。
+- 如果新内容和旧内容没有实质差异，不要输出它。
+- 如果没有必要更新，直接返回 {"updates":[] }。
+</task>
+
+<output_format>
+{
+  "updates": [
+    {
+      "entryName": "与输入完全一致的条目名",
+      "entryUid": 123,
+      "newContent": "完整的新内容",
+      "reason": "一句话说明原因"
+    },
+    {
+      "entryName": "__persona__",
+      "entryUid": -1,
+      "newContent": "更新后的人设全文",
+      "reason": "一句话说明原因"
+    }
+  ]
+}
+</output_format>`,
+  },
+];
+
+function injectBeforeClosingTag(content: string, tagName: string, addition: string): string {
+  const closingTag = `</${tagName}>`;
+  if (!content.includes(closingTag)) return content;
+  return content.replace(closingTag, `${addition}\n${closingTag}`);
+}
+
+SAFE_UPDATE_PROMPT_ITEMS[0].content = injectBeforeClosingTag(
+  SAFE_UPDATE_PROMPT_ITEMS[0].content,
+  'decision_rules',
+  `8. 多线剧情时，只更新与当前正文直接对应的那条线；不要把一条线的事实覆盖到另一条线。
+9. 用户 persona 只记录用户自身的稳定设定、长期偏好、长期关系倾向；普通剧情推进、他人状态变化、世界设定变化，不应写入 persona。
+10. 如果某条世界书条目已经能承载该事实，应优先更新世界书条目，而不是改写 persona。`,
+);
+
+SAFE_UPDATE_PROMPT_ITEMS[1].content = injectBeforeClosingTag(
+  SAFE_UPDATE_PROMPT_ITEMS[1].content,
+  'task',
+  `- 如果正文明确提到某个角色、组织、地点或设定变化，就优先检查对应世界书条目，而不是优先修改 persona。
+- 如果只是用户写作指导被正文转述，仍以正文最终呈现的事实为准。`,
+);
+
+const PROMPT_ITEM_BLOCKLIST = new Set([
+  'builtin_update_sys', // 被 SAFE[0] 替代（含 decision_rules）
+  // builtin_update_task 和 builtin_update_ast 恢复（CoT 思考链）
+]);
+
+const RawUpdateSchema = z.object({
+  entryName: z.union([z.string(), z.number()]).optional(),
+  name: z.union([z.string(), z.number()]).optional(),
+  newContent: z.union([z.string(), z.number()]).optional(),
+  content: z.union([z.string(), z.number()]).optional(),
+  reason: z.union([z.string(), z.number()]).optional(),
+  think: z.union([z.string(), z.number()]).optional(),
+  entryUid: z.union([z.number(), z.string()]).optional(),
+});
+
+const RawResponseSchema = z.object({
+  think: z.union([z.string(), z.number()]).optional(),
+  updates: z.array(RawUpdateSchema).default([]),
+});
 
 // ── Prefill 工具 ──
 
@@ -300,13 +588,27 @@ function buildUpdatePrompts(
   const enabledItems = preset.update_items.filter(p => p.enabled);
 
   const source = enabledItems.length > 0 ? enabledItems : BUILTIN_UPDATE_PRESET.filter(p => p.enabled);
-  return source.map(p => ({
-    role: p.role,
-    // 正确顺序：
-    // 1. 先替换 Lorevnter 数据宏（注入 {{lore_entries}} {{lore_context}} 等）
-    // 2. 再替换条目宏（{{macro}} → entry.content）+ 酒馆宏（{{user}} {{char}} 等）
-    content: resolveMacros(resolveLoreMacros(p.content, loreMacros), allEntries),
-  } as RolePrompt));
+  // 组装顺序：SAFE[0](系统规则) → 用户数据块+CoT指令+CoT锚定
+  // SAFE[0] 替代原 builtin_update_sys，包含 decision_rules 防止过度修改
+  // CoT 思考链（builtin_update_task + builtin_update_ast）恢复，确保 AI 逐条分析
+  const normalizedSource = [
+    SAFE_UPDATE_PROMPT_ITEMS[0],
+    ...source.filter(p => !PROMPT_ITEM_BLOCKLIST.has(p.id)),
+  ];
+
+  return normalizedSource
+    .map(p => ({
+      role: p.role,
+      content: (() => {
+        let content = resolveMacros(resolveLoreMacros(p.content, loreMacros), allEntries);
+        if (p.id === 'builtin_safe_update_sys') {
+          content += '\n<visible_think_policy>你可以返回 top-level think 和每条 update 的 think，但必须是可展示的简短分析摘要，不要长篇隐式推理。</visible_think_policy>';
+        }
+        return content;
+      })(),
+    } as RolePrompt))
+    // 过滤掉宏解析后内容为空的提示词块（如人设关闭时 <user_persona></user_persona>）
+    .filter(p => p.content.replace(/<[^>]+>\s*<\/[^>]+>/g, '').trim().length > 0);
 }
 
 
@@ -324,6 +626,29 @@ export async function analyzeOnePass(request: AnalysisRequest): Promise<Analysis
   const contextText = formatChatContext(request.chatMessages);
 
   // Step 2: 构建宏字典（Lorevnter 专属宏）
+
+  // 构建人设宏（含约束）
+  let personaMacroValue = '';
+  if (settings.lore_include_persona) {
+    const persona = getUserPersona();
+    if (persona) {
+      let personaBlock = persona;
+      // 附加人设约束（如有）
+      if (settings.lore_persona_constraint_id) {
+        const pc = getConstraintById(settings.lore_persona_constraint_id);
+        const currentCharacterScopeKey = useContextStore().context.characterScopeKey ?? '';
+        const scopeMatches = pc?.scope !== 'local'
+          || !settings.lore_persona_constraint_character_id
+          || settings.lore_persona_constraint_character_id === currentCharacterScopeKey;
+        if (pc && pc.enabled && pc.instruction && scopeMatches) {
+          personaBlock += `\n<persona_constraint name="${pc.name}">\n${pc.instruction}\n</persona_constraint>`;
+        }
+      }
+      personaMacroValue = personaBlock;
+      logger.debug('人设宏已注入');
+    }
+  }
+
   const loreMacros: Record<string, string> = {
     // 旧宏（兼容）
     lore_worldbook: worldbookText,
@@ -334,22 +659,25 @@ export async function analyzeOnePass(request: AnalysisRequest): Promise<Analysis
     lore_entries: formatEntriesBlock(request.entries),
     lore_constraints: formatConstraintsBlock(request.entries),
     lore_constraint_policy: formatConstraintPolicy(),
+    // 人设宏
+    lore_user_persona: personaMacroValue,
   };
 
   // Step 3: 构建消息序列（宏在 buildUpdatePrompts 内替换）
-  const ordered_prompts = buildUpdatePrompts(request.allEntries, loreMacros);
+  void loreMacros;
+  const ordered_prompts = buildUpdatePrompts(request.allEntries, buildLoreMacros(request));
 
   toastr.info('AI 正在分析...', 'Lorevnter');
 
   // 检测 assistant 预填充前缀（CoT 锚定）
-  const prefill = extractAssistantPrefill(ordered_prompts);
+  extractAssistantPrefill(ordered_prompts);
 
   try {
     const rawResponse = await callApi({ ordered_prompts });
 
     logger.debug('AI 原始响应', rawResponse);
-    const fullResponse = concatPrefill(prefill, rawResponse);
-    const result = parseAiResponse(fullResponse);
+    concatPrefill('', rawResponse);
+    const result = parseAiResponse(rawResponse, request);
     logger.info(`一次调用完成: ${result.updates.length} 条需更新`);
 
     if (result.updates.length > 0) {
@@ -371,14 +699,8 @@ export async function analyzeOnePass(request: AnalysisRequest): Promise<Analysis
 // ── 响应解析 ──
 
 /** 解析 AI 返回的更新指令 JSON */
-function parseAiResponse(raw: string): AnalysisResult {
-  const extractUpdates = (parsed: any): UpdateInstruction[] =>
-    (parsed.updates || []).map((u: any) => ({
-      entryName: String(u.entryName || u.name || ''),
-      newContent: String(u.newContent || u.content || ''),
-      reason: String(u.reason || ''),
-      entryUid: u.entryUid != null ? Number(u.entryUid) : undefined,
-    }));
+function parseAiResponse(raw: string, request: AnalysisRequest): AnalysisResult {
+  const extractUpdates = (_parsed?: any): UpdateInstruction[] => parseCandidateUpdates(raw);
 
   // 0. 剥离 CoT 思考标签（<lore_think>...</lore_think>）
   let cleaned = raw;
@@ -391,7 +713,7 @@ function parseAiResponse(raw: string): AnalysisResult {
   // 1. 最优路径：直接解析
   try {
     const parsed = JSON.parse(cleaned.trim());
-    return { updates: extractUpdates(parsed), rawResponse: raw };
+    return { updates: sanitizeAnalysisResult(request, extractUpdates(parsed)), rawResponse: raw, think: parsePublicThink(raw) };
   } catch { /* continue */ }
 
   // 2. markdown 代码块
@@ -399,7 +721,7 @@ function parseAiResponse(raw: string): AnalysisResult {
     const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (codeBlockMatch) {
       const parsed = JSON.parse(codeBlockMatch[1].trim());
-      return { updates: extractUpdates(parsed), rawResponse: raw };
+      return { updates: sanitizeAnalysisResult(request, extractUpdates(parsed)), rawResponse: raw, think: parsePublicThink(raw) };
     }
   } catch { /* continue */ }
 
@@ -408,7 +730,7 @@ function parseAiResponse(raw: string): AnalysisResult {
     const jsonMatch = cleaned.match(/(\{[\s\S]*\})/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[1].trim());
-      return { updates: extractUpdates(parsed), rawResponse: raw };
+      return { updates: sanitizeAnalysisResult(request, extractUpdates(parsed)), rawResponse: raw, think: parsePublicThink(raw) };
     }
   } catch { /* continue */ }
   // 4. 最终回退：宽松匹配
@@ -416,13 +738,13 @@ function parseAiResponse(raw: string): AnalysisResult {
     const looseMatch = cleaned.match(/\{[\s\S]*"updates"[\s\S]*\}/);
     if (looseMatch) {
       const parsed = JSON.parse(looseMatch[0]);
-      return { updates: extractUpdates(parsed), rawResponse: raw };
+      return { updates: sanitizeAnalysisResult(request, extractUpdates(parsed)), rawResponse: raw, think: parsePublicThink(raw) };
     }
   } catch { /* continue */ }
 
   logger.error('所有解析尝试均失败');
   toastr.error('AI 返回格式无法解析', 'Lorevnter');
-  return { updates: [], rawResponse: raw };
+  return { updates: [], rawResponse: raw, think: parsePublicThink(raw) };
 }
 
 
@@ -435,6 +757,26 @@ export function buildOnePassPrompts(request: AnalysisRequest): RolePrompt[] {
   const worldbookText = formatWorldbookEntries(request.entries, request.allEntries);
   const contextText = formatChatContext(request.chatMessages);
 
+  // 构建人设宏（与 analyzeOnePass 保持一致）
+  let personaMacroValue = '';
+  if (settings.lore_include_persona) {
+    const persona = getUserPersona();
+    if (persona) {
+      let personaBlock = persona;
+      if (settings.lore_persona_constraint_id) {
+        const pc = getConstraintById(settings.lore_persona_constraint_id);
+        const currentCharacterScopeKey = useContextStore().context.characterScopeKey ?? '';
+        const scopeMatches = pc?.scope !== 'local'
+          || !settings.lore_persona_constraint_character_id
+          || settings.lore_persona_constraint_character_id === currentCharacterScopeKey;
+        if (pc && pc.enabled && pc.instruction && scopeMatches) {
+          personaBlock += `\n<persona_constraint name="${pc.name}">\n${pc.instruction}\n</persona_constraint>`;
+        }
+      }
+      personaMacroValue = personaBlock;
+    }
+  }
+
   const loreMacros: Record<string, string> = {
     // 旧宏（兼容）
     lore_worldbook: worldbookText,
@@ -445,8 +787,10 @@ export function buildOnePassPrompts(request: AnalysisRequest): RolePrompt[] {
     lore_entries: formatEntriesBlock(request.entries),
     lore_constraints: formatConstraintsBlock(request.entries),
     lore_constraint_policy: formatConstraintPolicy(),
+    // 人设宏
+    lore_user_persona: personaMacroValue,
   };
 
-  return buildUpdatePrompts(request.allEntries, loreMacros);
+  void loreMacros;
+  return buildUpdatePrompts(request.allEntries, buildLoreMacros(request));
 }
-

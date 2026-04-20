@@ -19,7 +19,7 @@
       <div v-if="settings.lore_scan_trigger === 'auto'" class="st-row">
         <div class="st-row-main">
           <span class="st-label">触发楼层</span>
-          <input type="number" v-model.number="settings.lore_scan_interval" class="st-number" min="1" max="99" />
+          <input v-model.number="settings.lore_scan_interval" type="number" class="st-number" min="1" max="99" />
         </div>
         <span class="st-hint">每隔 {{ settings.lore_scan_interval }} 次 AI 回复触发一次分析（仅计 AI 回复楼层）</span>
       </div>
@@ -27,7 +27,7 @@
       <label v-if="settings.lore_scan_trigger === 'auto'" class="st-row">
         <div class="st-row-main">
           <span class="st-label">跳过零层</span>
-          <input type="checkbox" v-model="settings.lore_skip_greeting" class="ios-toggle" />
+          <input v-model="settings.lore_skip_greeting" type="checkbox" class="ios-toggle" />
         </div>
         <span class="st-hint">开启后首条 AI 回复（开场白）不计入自动触发楼层计数</span>
       </label>
@@ -35,7 +35,7 @@
       <div class="st-row">
         <div class="st-row-main">
           <span class="st-label">上下文消息数</span>
-          <input type="number" v-model.number="settings.lore_ai_max_context" class="st-number" min="1" max="50" />
+          <input v-model.number="settings.lore_ai_max_context" type="number" class="st-number" min="1" max="50" />
         </div>
         <span class="st-hint">发送给 AI 的最近聊天消息条数</span>
       </div>
@@ -86,14 +86,14 @@
     <div class="st-group">
       <div class="st-group-title">功能开关</div>
 
-      <label class="st-row" v-if="!settings.lore_debug_mode">
+      <label v-if="!settings.lore_debug_mode" class="st-row">
         <div class="st-row-main">
           <span class="st-label">修改审核</span>
-          <input type="checkbox" v-model="settings.lore_review_enabled" class="ios-toggle" />
+          <input v-model="settings.lore_review_enabled" type="checkbox" class="ios-toggle" />
         </div>
         <span class="st-hint">AI 分析完成后弹出审核弹窗，逐条确认修改（调试模式下强制开启）</span>
       </label>
-      <label class="st-row" v-if="settings.lore_debug_mode">
+      <label v-if="settings.lore_debug_mode" class="st-row">
         <div class="st-row-main">
           <span class="st-label">修改审核</span>
           <input type="checkbox" checked disabled class="ios-toggle" />
@@ -103,10 +103,10 @@
 
       <label class="st-row">
         <div class="st-row-main">
-          <span class="st-label">附加用户人设</span>
-          <input type="checkbox" v-model="settings.lore_include_persona" class="ios-toggle" />
+          <span class="st-label">用户人设处理</span>
+          <input v-model="settings.lore_include_persona" type="checkbox" class="ios-toggle" />
         </div>
-        <span class="st-hint">在 AI 提示词中附加 &lt;user_persona&gt; 标签包裹的用户人设</span>
+        <span class="st-hint">开启后，AI 分析时会同时处理用户人设的更新（可在约束 Tab 绑定约束）</span>
       </label>
     </div>
 
@@ -117,7 +117,7 @@
       <div class="st-row">
         <div class="st-row-main">
           <span class="st-label">起始排序号</span>
-          <input type="number" v-model.number="settings.lore_new_entry_start_order" class="st-number" min="0" max="9999" />
+          <input v-model.number="settings.lore_new_entry_start_order" type="number" class="st-number" min="0" max="9999" />
         </div>
         <span class="st-hint">新增条目的 order 起始值（0 = 自动: 最大 order + 10）</span>
       </div>
@@ -125,7 +125,7 @@
       <div class="st-row">
         <div class="st-row-main">
           <span class="st-label">默认世界书</span>
-          <button class="debug-action-btn" @click="refreshNewEntryWorldbooks" title="刷新列表">🔄</button>
+          <button class="debug-action-btn" title="刷新列表" @click="refreshNewEntryWorldbooks">🔄</button>
         </div>
         <select v-model="settings.lore_new_entry_default_worldbook" class="st-select st-select-full">
           <option value="">审核时手动选择</option>
@@ -153,9 +153,29 @@
       <div v-if="settings.lore_cache_clear_mode === 'manual'" class="st-row">
         <div class="st-row-main">
           <span class="st-label">缓存上限</span>
-          <input type="number" v-model.number="settings.lore_cache_max_size" class="st-number" min="0" max="999" />
+          <input v-model.number="settings.lore_cache_max_size" type="number" class="st-number" min="0" max="999" />
         </div>
         <span class="st-hint">0 = 无上限。超出上限时自动淘汰最早的条目</span>
+      </div>
+      <div v-if="settings.lore_cache_clear_mode === 'manual'" class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">缓存聊天数</span>
+          <span class="st-status">{{ cachedChatIds.length }} 个聊天</span>
+        </div>
+      </div>
+      <div v-if="settings.lore_cache_clear_mode === 'manual'" class="st-row" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="st-btn st-btn-danger" @click="onManualClearCache">🗑 清空当前聊天</button>
+        <button class="st-btn st-btn-danger" :disabled="cachedChatIds.length === 0" @click="onClearAllCaches">🗑 清空全部缓存</button>
+      </div>
+      <div v-if="settings.lore_cache_clear_mode === 'manual' && cachedChatIds.length > 0" class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">指定清理</span>
+          <select v-model="selectedCacheChatId" class="st-select st-select-flex">
+            <option value="">选择聊天...</option>
+            <option v-for="cid in cachedChatIds" :key="cid" :value="cid">{{ cid }}</option>
+          </select>
+          <button class="st-btn" :disabled="!selectedCacheChatId" @click="onClearSelectedChat">清理</button>
+        </div>
       </div>
     </div>
 
@@ -182,30 +202,25 @@
       <!-- 条目选择器（仅 include/exclude 模式显示） -->
       <template v-if="settings.lore_entry_filter_mode !== 'all'">
         <!-- 当前作用世界书提示 + 摘要 -->
-        <div class="st-row" v-if="filterCharWbNames.length > 0">
+        <div v-if="filterTargetWbNames.length > 0" class="st-row">
           <div style="display:flex;flex-direction:column;gap:4px;width:100%;">
             <span class="st-hint" style="font-weight:500;">
-              📚 当前角色卡世界书：{{ filterCharWbNames.join('、') }}
+              📚 当前主管线作用世界书：{{ filterTargetWbNames.join('、') }}
             </span>
             <span v-for="s in filterSummary" :key="s.wb" class="st-hint">
               {{ s.wb }}: {{ s.count }} 条目已选
             </span>
           </div>
         </div>
-        <div class="st-row" v-else>
-          <span class="st-hint st-hint-err">⚠ 未检测到角色卡内置世界书，请先打开一个角色卡聊天</span>
+        <div v-else class="st-row">
+          <span class="st-hint st-hint-err">⚠ 未检测到可作用的世界书，请先打开角色卡聊天或在设置里补充额外世界书</span>
         </div>
 
         <!-- 打开选择弹窗按钮 -->
-        <div class="st-row" v-if="filterCharWbNames.length > 0">
+        <div v-if="filterTargetWbNames.length > 0" class="st-row">
           <button class="debug-action-btn" style="width:100%;" @click="openFilterPopup">
             📋 选择条目
           </button>
-        </div>
-
-        <!-- 额外世界书封印 -->
-        <div class="st-row">
-          <span class="st-hint" style="opacity:0.6;">🔒 额外世界书：功能暂时封印，未来再开</span>
         </div>
       </template>
     </div>
@@ -223,9 +238,9 @@
           </div>
 
           <!-- 世界书 Tab -->
-          <div class="entry-popup-tabs" v-if="filterCharWbNames.length > 1">
+          <div v-if="filterTargetWbNames.length > 1" class="entry-popup-tabs">
             <button
-              v-for="wb in filterCharWbNames" :key="wb"
+              v-for="wb in filterTargetWbNames" :key="wb"
               class="entry-filter-wb-tab"
               :class="{ active: filterActiveWb === wb }"
               @click="switchFilterWb(wb)"
@@ -235,8 +250,8 @@
           <!-- 搜索 + 操作栏 -->
           <div class="entry-popup-toolbar">
             <input
-              type="text"
               v-model="filterSearchQuery"
+              type="text"
               class="entry-popup-search"
               placeholder="🔍 搜索条目..."
             />
@@ -263,8 +278,8 @@
               <input
                 type="checkbox"
                 :checked="isEntrySelected(entry.uid)"
-                @change="onToggleEntry(entry.uid)"
                 class="entry-filter-checkbox"
+                @change="onToggleEntry(entry.uid)"
               />
               <span class="entry-filter-name">{{ entry.name || `uid_${entry.uid}` }}</span>
             </label>
@@ -300,18 +315,18 @@
 
           <template v-if="!isAllSameAsPreset">
             <div class="st-param-grid">
-              <div class="st-param-item" v-for="param in samplingParams" :key="param.key">
+              <div v-for="param in samplingParams" :key="param.key" class="st-param-item">
                 <label class="st-param-label">
                   <span>{{ param.label }}</span>
                 </label>
                 <input
                   type="number"
                   :value="settings[param.key] === 'same_as_preset' ? param.default : settings[param.key]"
-                  @input="settings[param.key] = Number(($event.target as HTMLInputElement).value)"
                   class="st-number st-number-wide"
                   :min="param.min"
                   :max="param.max"
                   :step="param.step"
+                  @input="settings[param.key] = Number(($event.target as HTMLInputElement).value)"
                 />
               </div>
             </div>
@@ -438,6 +453,44 @@ function refreshNewEntryWorldbooks() {
   newEntryWorldbooks.value = getAvailableWorldbooks();
 }
 
+// ── 缓存手动清理 ──
+import { clearCacheForChat, getCurrentCacheChatId, getCachedChatIds, clearAllCaches } from '../../core/scan-cache';
+
+const cachedChatIds = ref<string[]>(getCachedChatIds());
+const selectedCacheChatId = ref('');
+
+function refreshCachedChatIds() {
+  cachedChatIds.value = getCachedChatIds();
+}
+
+function onManualClearCache() {
+  const chatId = getCurrentCacheChatId();
+  if (!chatId) {
+    toastr.warning('当前无聊天 ID，无法清理', 'Lorevnter');
+    return;
+  }
+  if (!confirm(`确认清空当前聊天 (${chatId}) 的缓存？`)) return;
+  clearCacheForChat(chatId);
+  refreshCachedChatIds();
+  toastr.success('当前聊天缓存已清空', 'Lorevnter');
+}
+
+function onClearAllCaches() {
+  if (!confirm(`确认清空全部 ${cachedChatIds.value.length} 个聊天的缓存？此操作不可恢复。`)) return;
+  clearAllCaches();
+  refreshCachedChatIds();
+  toastr.success('全部缓存已清空', 'Lorevnter');
+}
+
+function onClearSelectedChat() {
+  if (!selectedCacheChatId.value) return;
+  if (!confirm(`确认清空聊天 "${selectedCacheChatId.value}" 的缓存？`)) return;
+  clearCacheForChat(selectedCacheChatId.value);
+  selectedCacheChatId.value = '';
+  refreshCachedChatIds();
+  toastr.success('指定聊天缓存已清空', 'Lorevnter');
+}
+
 // ── 条目处理范围 ──
 import * as WorldbookAPI from '../../core/worldbook-api';
 import { useContextStore } from '../../core/worldbook-context';
@@ -449,7 +502,7 @@ const filterEntries = ref<FilterEntry[]>([]);
 const filterEntriesLoading = ref(false);
 
 /** 从 context store 获取管线实际处理的世界书名（与主管线完全对齐） */
-const filterCharWbNames = computed(() => {
+const filterTargetWbNames = computed(() => {
   const ctx = useContextStore();
   return ctx.getActiveWorldbookNames();
 });
@@ -457,8 +510,8 @@ const filterCharWbNames = computed(() => {
 /** 模式切换时自动加载第一本世界书条目 */
 async function onFilterModeChange() {
   if (settings.lore_entry_filter_mode === 'all') return;
-  if (filterCharWbNames.value.length > 0 && !filterActiveWb.value) {
-    await switchFilterWb(filterCharWbNames.value[0]);
+  if (filterTargetWbNames.value.length > 0 && !filterActiveWb.value) {
+    await switchFilterWb(filterTargetWbNames.value[0]);
   }
 }
 
@@ -550,8 +603,8 @@ const teleportTarget = computed(() => {
 async function openFilterPopup() {
   filterSearchQuery.value = '';
   // 自动加载第一本世界书
-  if (filterCharWbNames.value.length > 0 && !filterActiveWb.value) {
-    await switchFilterWb(filterCharWbNames.value[0]);
+  if (filterTargetWbNames.value.length > 0 && !filterActiveWb.value) {
+    await switchFilterWb(filterTargetWbNames.value[0]);
   }
   filterPopupOpen.value = true;
 }

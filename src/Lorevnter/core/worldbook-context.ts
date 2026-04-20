@@ -6,6 +6,7 @@
 import { createLogger } from '../logger';
 import { useSettingsStore } from '../settings';
 import * as WorldbookAPI from './worldbook-api';
+import { detectCurrentCharacterScopeKey } from './character-scope';
 import { getCurrentCacheChatId } from './scan-cache';
 
 const logger = createLogger('context');
@@ -27,6 +28,8 @@ export interface WorldbookContext {
   sourceLabel: string;
   /** 当前角色名 */
   characterName: string | null;
+  /** 当前角色作用域键（稳定于显示名） */
+  characterScopeKey: string | null;
   /** 当前聊天 ID */
   chatId: string | null;
   /** 上次刷新时间 */
@@ -41,6 +44,7 @@ function createDefaultContext(): WorldbookContext {
     chat: null,
     sourceLabel: '空闲',
     characterName: null,
+    characterScopeKey: null,
     chatId: null,
     lastRefreshed: 0,
   };
@@ -63,6 +67,7 @@ export const useContextStore = defineStore('lorevnter_context', () => {
     try {
       const active = WorldbookAPI.getActive();
       const charName = getCurrentCharacterName();
+      const charScopeKey = detectCurrentCharacterScopeKey(active.character.primary, charName);
       const chatId = getCurrentCacheChatId() || null;
 
       const ctx = context.value;
@@ -70,6 +75,7 @@ export const useContextStore = defineStore('lorevnter_context', () => {
       ctx.global = active.global;
       ctx.chat = active.chat;
       ctx.characterName = charName;
+      ctx.characterScopeKey = charScopeKey || null;
       ctx.chatId = chatId;
       ctx.lastRefreshed = Date.now();
 
@@ -91,6 +97,7 @@ export const useContextStore = defineStore('lorevnter_context', () => {
         character: ctx.character,
         global: ctx.global,
         chat: ctx.chat,
+        characterScopeKey: ctx.characterScopeKey,
         chatId: ctx.chatId,
       });
 

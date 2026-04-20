@@ -12,6 +12,7 @@ export interface ReviewUpdate {
   newContent: string;
   /** AI 给出的修改理由 */
   reason: string;
+  think?: string;
   /** 审核状态：null=未决, true=通过, false=拒绝 */
   approved: boolean | null;
   /** 操作类型: create=新条目, append=追加内容, modify=修改内容 */

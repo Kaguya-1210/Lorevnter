@@ -14,7 +14,7 @@ const logger = createLogger('constraints');
 function getCurrentCharacterId(): string {
   try {
     const ctx = useContextStore();
-    return ctx.context.characterName ?? '';
+    return ctx.context.characterScopeKey ?? '';
   } catch {
     return '';
   }
@@ -176,9 +176,17 @@ export async function setEntryMacro(
 
 /** 从条目获取其绑定的约束（兼容旧 entry.extra + 新绑定表） */
 export function getEntryConstraint(entry: WorldbookEntry, worldbookName?: string): LoreConstraint | null {
-  const constraints = getEntryConstraints(entry, worldbookName);
+  const constraints = getPromptConstraints(entry, worldbookName);
   // 返回第一个（向后兼容：旧代码期望单条约束）
   return constraints.length > 0 ? constraints[0] : null;
+}
+
+export function getPromptConstraints(entry: WorldbookEntry, worldbookName?: string): LoreConstraint[] {
+  return getEntryConstraints(entry, worldbookName).filter(c => c.type === 'prompt');
+}
+
+export function hasSkipConstraint(entry: WorldbookEntry, worldbookName?: string): boolean {
+  return getEntryConstraints(entry, worldbookName).some(c => c.type === 'skip');
 }
 
 /**
@@ -225,7 +233,7 @@ export function collectActiveConstraints(
   const map = new Map<string, { constraint: LoreConstraint; entryNames: string[] }>();
 
   for (const { entry, worldbookName } of entries) {
-    const constraints = getEntryConstraints(entry, worldbookName);
+    const constraints = getPromptConstraints(entry, worldbookName);
     for (const c of constraints) {
       if (!map.has(c.id)) {
         map.set(c.id, { constraint: c, entryNames: [] });

@@ -64,7 +64,11 @@
           </label>
           <label class="ct-label ct-toggle-label">
             <span>启用约束</span>
-            <input type="checkbox" v-model="selected.enabled" class="ios-toggle" />
+            <input v-model="selected.enabled" type="checkbox" class="ios-toggle" />
+          </label>
+          <label v-if="selected.type === 'prompt'" class="ct-label ct-toggle-label">
+            <span>绑定到用户人设</span>
+            <input type="checkbox" :checked="isPersonaBound" class="ios-toggle" @change="onTogglePersonaBind" />
           </label>
           <div class="ct-form-actions">
             <button class="ct-btn ct-btn-danger" @click="onDelete">🗑 删除</button>
@@ -83,8 +87,8 @@
           <!-- 搜索 + 操作栏 -->
           <div class="entry-popup-toolbar" style="padding: 0 0 8px 0; border: none;">
             <input
-              type="text"
               v-model="bindSearchQuery"
+              type="text"
               class="entry-popup-search"
               placeholder="🔍 搜索条目..."
             />
@@ -162,6 +166,7 @@ import * as WorldbookAPI from '../../core/worldbook-api';
 import { useContextStore } from '../../core/worldbook-context';
 
 const { settings } = useSettingsStore();
+const ctx = useContextStore();
 
 // ── 约束列表 ──
 const constraints = computed(() => settings.lore_constraints);
@@ -190,8 +195,46 @@ function onDelete() {
   if (!selected.value) return;
   const name = selected.value.name;
   if (!confirm(`确认删除约束「${name}」？`)) return;
+  // 如果删除的约束绑定了人设，同时清空绑定
+  if (settings.lore_persona_constraint_id === selected.value.id) {
+    settings.lore_persona_constraint_id = '';
+    settings.lore_persona_constraint_character_id = '';
+  }
   Constraints.deleteConstraint(selected.value.id);
   selectedId.value = null;
+}
+
+// ── 人设绑定 ──
+const isPersonaBound = computed(() =>
+  selected.value
+    ? settings.lore_persona_constraint_id === selected.value.id
+      && (
+        (selected.value.scope ?? 'global') !== 'local'
+        || settings.lore_persona_constraint_character_id === (ctx.context.characterScopeKey ?? '')
+      )
+    : false,
+);
+
+function onTogglePersonaBind() {
+  if (!selected.value) return;
+  if (isPersonaBound.value) {
+    // 解绑
+    settings.lore_persona_constraint_id = '';
+    settings.lore_persona_constraint_character_id = '';
+    toastr.info(`已解除约束「${selected.value.name}」与人设的绑定`, 'Lorevnter');
+  } else {
+    if ((selected.value.scope ?? 'global') === 'local' && !ctx.context.characterScopeKey) {
+      toastr.warning('当前未识别到角色作用域，无法绑定局部人设约束', 'Lorevnter');
+      return;
+    }
+    // 绑定（互斥：覆盖之前的绑定）
+    settings.lore_persona_constraint_id = selected.value.id;
+    settings.lore_persona_constraint_character_id =
+      (selected.value.scope ?? 'global') === 'local'
+        ? (ctx.context.characterScopeKey ?? '')
+        : '';
+    toastr.success(`约束「${selected.value.name}」已绑定到用户人设`, 'Lorevnter');
+  }
 }
 
 // ── 引用计数（待实现） ──
@@ -219,7 +262,7 @@ const filteredBindEntries = computed(() => {
 function getBindCharId(): string {
   if (!selected.value) return '';
   return (selected.value.scope ?? 'global') === 'local'
-    ? (useContextStore().context.characterName ?? '')
+    ? (ctx.context.characterScopeKey ?? '')
     : '';
 }
 
@@ -342,8 +385,15 @@ function onToggleBind(entry: WorldbookEntry, event: Event) {
 /** 检查条目是否绑定到「其他」约束（绑定表 + 旧 extra 兼容） */
 function isBoundToOther(entry: WorldbookEntry): boolean {
   if (!selected.value || !bindWorldbook.value) return false;
+  const currentCharId = ctx.context.characterScopeKey ?? '';
   const otherBinding = settings.lore_constraint_bindings.some(
-    b => b.worldbook === bindWorldbook.value && b.entryUid === entry.uid && b.constraintId !== selected.value!.id
+    (b) => {
+      if (b.worldbook !== bindWorldbook.value || b.entryUid !== entry.uid || b.constraintId === selected.value!.id) {
+        return false;
+      }
+      if (!b.characterId) return true;
+      return b.characterId === currentCharId;
+    }
   );
   if (otherBinding) return true;
   const legacyId = entry.extra?.lore_constraint_id;

@@ -7,13 +7,13 @@ import { createLogger } from '../logger';
 import { useSettingsStore } from '../settings';
 import { useContextStore } from './worldbook-context';
 import { useRuntimeStore } from '../state';
-import { getEntryConstraint } from './constraints';
+import { getEntryConstraint, hasSkipConstraint } from './constraints';
 import * as WorldbookAPI from './worldbook-api';
 import { analyzeOnePass, getApiSnapshot, type AnalysisEntry, type AnalysisRequest } from './ai-engine';
 import { autoBackupIfNeeded } from './backup-manager';
 import { extractContent } from './context-extractor';
-import { getUserPersona } from './persona';
-import { getCachedEntryNames, clearCacheAfterAnalysis } from './scan-cache';
+import { getUserPersona, setUserPersona } from './persona';
+import { getCachedEntryKeys, clearCacheAfterAnalysis } from './scan-cache';
 import { openReviewEditor } from './review-editor';
 import type { ReviewUpdate } from './review-types';
 
@@ -85,21 +85,153 @@ export function resetMessageCount(): void {
 /**
  * 判断已有条目的变更类型：追加 or 修改
  * - 原文为空 → append
- * - 新内容包含原文全部内容（按行检测） → append
+ * - 新内容以原文为严格前缀 → append
  * - 否则 → modify
  */
 function classifyAction(originalContent: string, newContent: string): 'append' | 'modify' {
-  const trimOrig = originalContent.trim();
-  const trimNew = newContent.trim();
-  if (!trimOrig) return 'append';
-  // 快速路径：前缀匹配
-  if (trimNew.startsWith(trimOrig)) return 'append';
-  // 按行检测：原文的每一行是否都出现在新文中（容忍空白差异）
-  const origLines = trimOrig.split('\n').map(l => l.trim()).filter(Boolean);
-  const newText = trimNew;
-  const allPresent = origLines.every(line => newText.includes(line));
-  if (allPresent && trimNew.length > trimOrig.length) return 'append';
+  const normalizedOrig = originalContent.replace(/\r\n/g, '\n').trimEnd();
+  const normalizedNew = newContent.replace(/\r\n/g, '\n').trimEnd();
+  if (!normalizedOrig.trim()) return 'append';
+  if (normalizedNew.length <= normalizedOrig.length) return 'modify';
+  if (normalizedNew.startsWith(normalizedOrig)) return 'append';
   return 'modify';
+}
+
+type EntryResolution =
+  | { status: 'found'; worldbookName: string; entry: WorldbookEntry }
+  | { status: 'missing' }
+  | { status: 'ambiguous'; matches: Array<{ worldbookName: string; entry: WorldbookEntry }> };
+
+type CollectedAnalysisInputs = {
+  chatMessages: string[];
+  allEntries: WorldbookEntry[];
+  worldbookMap: Record<string, WorldbookEntry[]>;
+  analysisEntries: AnalysisEntry[];
+};
+
+function normalizeMatchText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[\s"'`.,!?;:()[\]{}<>/\\|@#$%^&*_+=~-]+/g, '')
+    .replace(/[，。！？；：、“”‘’（）《》【】·…—]/g, '');
+}
+
+function getEntryMatchTerms(entry: WorldbookEntry): string[] {
+  const rawTerms: string[] = [];
+  const candidateArrays = [
+    (entry as { keys?: unknown }).keys,
+    (entry as { key?: unknown }).key,
+    (entry as { secondary_keys?: unknown }).secondary_keys,
+    (entry as { secondaryKeys?: unknown }).secondaryKeys,
+  ];
+
+  if (typeof entry.name === 'string') {
+    rawTerms.push(entry.name);
+  }
+
+  for (const value of candidateArrays) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item === 'string' && item.trim().length >= 4) rawTerms.push(item);
+      }
+    } else if (typeof value === 'string') {
+      if (value.trim().length >= 4) rawTerms.push(value);
+    }
+  }
+
+  return [...new Set(rawTerms.map(term => term.trim()).filter(term => term.length >= 2))];
+}
+
+function isEntryMentionedInContext(entry: WorldbookEntry, normalizedContext: string): boolean {
+  if (!normalizedContext) return false;
+
+  return getEntryMatchTerms(entry).some((term) => {
+    const normalizedTerm = normalizeMatchText(term);
+    return normalizedTerm.length >= 2 && normalizedContext.includes(normalizedTerm);
+  });
+}
+
+function passesEntryFilter(entry: WorldbookEntry, worldbookName: string): boolean {
+  const { settings } = useSettingsStore();
+  const filterUids = settings.lore_entry_filter_map[worldbookName];
+  const filterUidSet = filterUids ? new Set(filterUids) : null;
+
+  if (settings.lore_entry_filter_mode === 'include') {
+    return filterUidSet?.has(entry.uid) ?? false;
+  }
+  if (settings.lore_entry_filter_mode === 'exclude') {
+    return !filterUidSet?.has(entry.uid);
+  }
+  return true;
+}
+
+async function collectAnalysisInputs(worldbookNames: string[]): Promise<CollectedAnalysisInputs> {
+  const { settings } = useSettingsStore();
+  const chatMessages = getRecentChatMessages(settings.lore_ai_max_context);
+  const normalizedContext = normalizeMatchText(chatMessages.join('\n'));
+  const allEntries: WorldbookEntry[] = [];
+  const worldbookMap: Record<string, WorldbookEntry[]> = {};
+  const analysisEntries: AnalysisEntry[] = [];
+
+  if (chatMessages.length === 0) {
+    return { chatMessages, allEntries, worldbookMap, analysisEntries };
+  }
+
+  const cachedEntryKeys = getCachedEntryKeys();
+  const hasCachedKeys = cachedEntryKeys.length > 0;
+  const cachedKeySet = new Set(cachedEntryKeys);
+  const expandedEntries: string[] = [];
+
+  if (hasCachedKeys) {
+    logger.info(`使用命中缓存过滤: ${cachedEntryKeys.length} 条命中条目`);
+  } else {
+    logger.warn('无命中缓存，将分析全部条目（首次运行或缓存已清空）');
+  }
+
+  for (const wbName of worldbookNames) {
+    try {
+      const entries = await WorldbookAPI.fetch(wbName);
+      worldbookMap[wbName] = entries;
+      allEntries.push(...entries);
+
+      for (const entry of entries) {
+        const constraint = getEntryConstraint(entry, wbName);
+
+        if (hasSkipConstraint(entry, wbName)) {
+          logger.debug(`跳过条目: ${entry.name} (约束: skip)`);
+          continue;
+        }
+
+        if (!passesEntryFilter(entry, wbName)) {
+          continue;
+        }
+
+        const cacheKey = `${wbName}.${entry.uid}`;
+        const includedByCache = !hasCachedKeys || cachedKeySet.has(cacheKey);
+        const includedByContextMention = hasCachedKeys
+          && !includedByCache
+          && isEntryMentionedInContext(entry, normalizedContext);
+
+        if (!includedByCache && !includedByContextMention) {
+          continue;
+        }
+
+        if (includedByContextMention) {
+          expandedEntries.push(`${wbName}/${entry.name || `uid_${entry.uid}`}`);
+        }
+
+        analysisEntries.push({ entry, constraint, worldbookName: wbName });
+      }
+    } catch (e) {
+      logger.error(`加载世界书失败: ${wbName} - ${(e as Error).message}`);
+    }
+  }
+
+  if (expandedEntries.length > 0) {
+    logger.info(`基于正文点名兜底扩容 ${expandedEntries.length} 条: ${expandedEntries.slice(0, 10).join(', ')}`);
+  }
+
+  return { chatMessages, allEntries, worldbookMap, analysisEntries };
 }
 
 /**
@@ -165,55 +297,8 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
     // Step 1.5: 自动备份（AI 分析前快照）
     await autoBackupIfNeeded(worldbookNames);
 
-    // Step 2: 加载条目 + 命中过滤
-    const allEntries: WorldbookEntry[] = [];
-    const worldbookMap: Record<string, WorldbookEntry[]> = {};
-    const analysisEntries: AnalysisEntry[] = [];
-
-    // 获取酒馆命中的条目名（scan-cache 缓存）
-    const cachedNames = getCachedEntryNames();
-    const hasCachedNames = cachedNames.length > 0;
-    const cachedNameSet = new Set(cachedNames);
-
-    if (hasCachedNames) {
-      logger.info(`使用命中缓存过滤: ${cachedNames.length} 条命中条目`);
-    } else {
-      logger.warn('无命中缓存，将分析全部条目（首次运行或缓存已清空）');
-    }
-
-    for (const wbName of worldbookNames) {
-      try {
-        const entries = await WorldbookAPI.fetch(wbName);
-        worldbookMap[wbName] = entries;
-        allEntries.push(...entries);
-
-        // 条目处理范围过滤集（当前世界书）
-        const filterUids = settings.lore_entry_filter_map[wbName];
-        const filterUidSet = filterUids ? new Set(filterUids) : null;
-
-        for (const entry of entries) {
-          const constraint = getEntryConstraint(entry, wbName);
-          // 1. 跳过 skip 类型
-          if (constraint?.type === 'skip') {
-            logger.debug(`跳过条目: ${entry.name} (约束: skip)`);
-            continue;
-          }
-          // 2. 命中过滤：有缓存时只保留命中的条目
-          if (hasCachedNames && !cachedNameSet.has(entry.name)) {
-            continue;
-          }
-          // 3. 条目处理范围过滤
-          if (settings.lore_entry_filter_mode === 'include') {
-            if (!filterUidSet?.has(entry.uid)) continue;
-          } else if (settings.lore_entry_filter_mode === 'exclude') {
-            if (filterUidSet?.has(entry.uid)) continue;
-          }
-          analysisEntries.push({ entry, constraint, worldbookName: wbName });
-        }
-      } catch (e) {
-        logger.error(`加载世界书失败: ${wbName} — ${(e as Error).message}`);
-      }
-    }
+    // Step 2: 收集上下文 + 分析候选条目
+    const { chatMessages, allEntries, worldbookMap, analysisEntries } = await collectAnalysisInputs(worldbookNames);
 
     if (analysisEntries.length === 0) {
       toastr.info('没有命中的条目需要分析', 'Lorevnter');
@@ -224,8 +309,7 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
 
     logger.info(`待分析: ${analysisEntries.length} 条目 (共 ${allEntries.length} 条, ${allEntries.length - analysisEntries.length} 跳过)`);
 
-    // Step 3: 收集聊天上下文
-    const chatMessages = getRecentChatMessages(settings.lore_ai_max_context);
+    // Step 3: 校验聊天上下文
     if (chatMessages.length === 0) {
       toastr.warning('聊天记录为空，无法分析', 'Lorevnter');
       runtime.pipelineStatus = 'failed';
@@ -233,14 +317,7 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
       return 'failed';
     }
 
-    // Step 3.5: 用户 persona 注入
-    if (settings.lore_include_persona) {
-      const persona = getUserPersona();
-      if (persona) {
-        chatMessages.unshift(`[用户人设信息] ${persona}`);
-        logger.debug('已注入用户 persona');
-      }
-    }
+    // Step 3.5: 用户 persona 注入（已迁移至 ai-engine 宏系统 {{lore_user_persona}}）
 
     // Step 4: 调用 AI
     const request: AnalysisRequest = {
@@ -262,20 +339,47 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
 
       if (shouldReview) {
         // 审核模式：构造 ReviewUpdate 并打开审核弹窗
-        const reviewUpdates: ReviewUpdate[] = result.updates.map(u => {
-          const found = findWorldbookForEntry(u.entryName, worldbookMap, u.entryUid);
-          const originalContent = found?.entry.content ?? '';
-          return {
+        const reviewUpdates: ReviewUpdate[] = result.updates.flatMap((u) => {
+          // 人设更新特殊处理
+          if (u.entryName === '__persona__') {
+            const currentPersona = getUserPersona() ?? '';
+            return [{
+              entryName: '用户人设',
+              originalContent: currentPersona,
+              newContent: u.newContent,
+              reason: u.reason,
+              think: u.think,
+              approved: null,
+              action: classifyAction(currentPersona, u.newContent),
+              uid: -1,
+              worldbook: '__persona__',
+            }];
+          }
+          const resolution = resolveWorldbookEntry(u.entryName, worldbookMap, u.entryUid);
+          if (resolution.status === 'ambiguous') {
+            logger.warn(`跳过不安全写回: "${u.entryName}" 存在 ${resolution.matches.length} 个同名候选且缺少可用 uid`);
+            return [];
+          }
+          const originalContent = resolution.status === 'found' ? resolution.entry.content : '';
+          return [{
             entryName: u.entryName,
             originalContent,
             newContent: u.newContent,
             reason: u.reason,
+            think: u.think,
             approved: null,
-            action: found ? classifyAction(originalContent, u.newContent) : 'create' as const,
-            uid: found?.entry.uid ?? -1,
-            worldbook: found?.worldbookName ?? defaultCreateWb,
-          };
+            action: resolution.status === 'found' ? classifyAction(originalContent, u.newContent) : 'create' as const,
+            uid: resolution.status === 'found' ? resolution.entry.uid : -1,
+            worldbook: resolution.status === 'found' ? resolution.worldbookName : defaultCreateWb,
+          }];
         });
+
+        if (reviewUpdates.length === 0) {
+          toastr.warning('AI 返回了无法安全定位的更新，已跳过写回', 'Lorevnter');
+          runtime.pipelineStatus = 'failed';
+          runtime.pipelineLastMessage = 'AI 返回的更新无法安全定位';
+          return 'failed';
+        }
 
         // 记录 AI 调用历史（审核前）
         recordAiCall(request, result, 0);
@@ -285,7 +389,16 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
           let appliedCount = 0;
           for (const update of approved) {
             try {
-              if (update.action === 'create') {
+              if (update.worldbook === '__persona__') {
+                // 人设更新
+                const ok = setUserPersona(update.newContent);
+                if (ok) {
+                  appliedCount++;
+                  logger.info(`已更新用户人设`);
+                } else {
+                  logger.error('人设写入失败');
+                }
+              } else if (update.action === 'create') {
                 // 新增条目
                 const targetWb = update.worldbook || defaultCreateWb;
                 await WorldbookAPI.createEntries(targetWb, [{
@@ -315,7 +428,6 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
             }
           }
           toastr.success(`审核完成，已写入 ${appliedCount} 条`, 'Lorevnter');
-          clearCacheAfterAnalysis();
         });
 
         logger.info(`管线完成: ${result.updates.length} 条待审核`);
@@ -326,9 +438,24 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
         // 直接写入模式
         let appliedCount = 0;
         for (const update of result.updates) {
-          const targetWb = findWorldbookForEntry(update.entryName, worldbookMap, update.entryUid);
           try {
-            if (!targetWb) {
+            // 人设更新特殊处理
+            if (update.entryName === '__persona__') {
+              const ok = setUserPersona(update.newContent);
+              if (ok) {
+                appliedCount++;
+                logger.info('已更新用户人设');
+              } else {
+                logger.error('人设写入失败');
+              }
+              continue;
+            }
+            const resolution = resolveWorldbookEntry(update.entryName, worldbookMap, update.entryUid);
+            if (resolution.status === 'ambiguous') {
+              logger.warn(`跳过不安全写回: "${update.entryName}" 存在多个同名条目`);
+              continue;
+            }
+            if (resolution.status === 'missing') {
               // 新增条目
               const createWb = defaultCreateWb;
               if (!createWb) {
@@ -351,11 +478,11 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
               logger.info(`已新增: ${update.entryName} → ${createWb}`);
             } else {
               // 更新已有条目（通过 uid 精确定位）
-              await WorldbookAPI.updateEntry(targetWb.worldbookName, targetWb.entry.uid, {
+              await WorldbookAPI.updateEntry(resolution.worldbookName, resolution.entry.uid, {
                 content: update.newContent,
               });
               appliedCount++;
-              logger.info(`已更新: ${update.entryName} uid:${targetWb.entry.uid} (${update.reason})`);
+              logger.info(`已更新: ${update.entryName} uid:${resolution.entry.uid} (${update.reason})`);
             }
           } catch (e) {
             logger.error(`写入失败: ${update.entryName} — ${(e as Error).message}`);
@@ -365,7 +492,6 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
         toastr.success(`已写入 ${appliedCount} 条: ${names}`, 'Lorevnter');
         logger.info(`管线完成: ${appliedCount}/${result.updates.length} 条已应用`);
         recordAiCall(request, result, appliedCount);
-        clearCacheAfterAnalysis();
         runtime.pipelineStatus = 'done';
         runtime.pipelineLastMessage = `已写入 ${appliedCount} 条`;
         return 'applied';
@@ -385,6 +511,7 @@ export async function runUpdatePipeline(): Promise<PipelineResult> {
     return 'failed';
   } finally {
     clearTimeout(pipelineTimeout);
+    clearCacheAfterAnalysis();
     running = false;
   }
 }
@@ -413,14 +540,15 @@ function getRecentChatMessages(maxCount: number): string[] {
     return msgs
       // 只取 AI/char 消息，不包含用户输入
       .filter((msg) => msg.role !== 'user' && msg.message && typeof msg.message === 'string')
-      .slice(-maxCount)
       .map((msg) => {
         const content = (includeTag || excludeTags)
           ? extractContent(msg.message, includeTag, excludeTags)
-          : msg.message;
-        return `{{char}}: ${content}`;
+          : msg.message.trim();
+        return content.trim();
       })
-      .filter(msg => msg.trim().length > 5);
+      .filter(content => content.length > 0)
+      .slice(-maxCount)
+      .map(content => `{{char}}: ${content}`);
   } catch (e) {
     logger.error(`获取聊天消息失败: ${(e as Error).message}`);
     return [];
@@ -428,24 +556,29 @@ function getRecentChatMessages(maxCount: number): string[] {
 }
 
 /** 根据条目名称找到所属世界书 */
-function findWorldbookForEntry(
+function resolveWorldbookEntry(
   entryName: string,
   worldbookMap: Record<string, WorldbookEntry[]>,
   uid?: number,
-): { worldbookName: string; entry: WorldbookEntry } | null {
+): EntryResolution {
   // 优先按 uid 精确匹配
   if (uid != null && uid >= 0) {
     for (const [wbName, entries] of Object.entries(worldbookMap)) {
       const entry = entries.find((e) => e.uid === uid);
-      if (entry) return { worldbookName: wbName, entry };
+      if (entry) return { status: 'found', worldbookName: wbName, entry };
     }
   }
-  // 回退：按 name 匹配
+
+  // 回退：仅在 name 全局唯一时才允许使用
+  const matches: Array<{ worldbookName: string; entry: WorldbookEntry }> = [];
   for (const [wbName, entries] of Object.entries(worldbookMap)) {
     const entry = entries.find((e) => e.name === entryName);
-    if (entry) return { worldbookName: wbName, entry };
+    if (entry) matches.push({ worldbookName: wbName, entry });
   }
-  return null;
+
+  if (matches.length === 1) return { status: 'found', ...matches[0] };
+  if (matches.length > 1) return { status: 'ambiguous', matches };
+  return { status: 'missing' };
 }
 
 /** 记录 AI 调用到 runtime 历史 */
@@ -482,52 +615,16 @@ function recordAiCall(
  */
 export async function buildAnalysisRequest(): Promise<AnalysisRequest | null> {
   const ctx = useContextStore();
-  const { settings } = useSettingsStore();
 
   if (ctx.context.mode === 'idle') return null;
 
   const worldbookNames = ctx.getActiveWorldbookNames();
   if (worldbookNames.length === 0) return null;
 
-  const allEntries: WorldbookEntry[] = [];
-  const worldbookMap: Record<string, WorldbookEntry[]> = {};
-  const analysisEntries: AnalysisEntry[] = [];
-
-  // 获取酒馆命中的条目名（scan-cache 缓存）
-  const cachedNames = getCachedEntryNames();
-  const hasCachedNames = cachedNames.length > 0;
-  const cachedNameSet = new Set(cachedNames);
-
-  for (const wbName of worldbookNames) {
-    try {
-      const entries = await WorldbookAPI.fetch(wbName);
-      worldbookMap[wbName] = entries;
-      allEntries.push(...entries);
-
-      const filterUids = settings.lore_entry_filter_map[wbName];
-      const filterUidSet = filterUids ? new Set(filterUids) : null;
-
-      for (const entry of entries) {
-        const constraint = getEntryConstraint(entry, wbName);
-        if (constraint?.type === 'skip') continue;
-        // 命中过滤
-        if (hasCachedNames && !cachedNameSet.has(entry.name)) continue;
-        // 条目处理范围过滤
-        if (settings.lore_entry_filter_mode === 'include') {
-          if (!filterUidSet?.has(entry.uid)) continue;
-        } else if (settings.lore_entry_filter_mode === 'exclude') {
-          if (filterUidSet?.has(entry.uid)) continue;
-        }
-        analysisEntries.push({ entry, constraint, worldbookName: wbName });
-      }
-    } catch {
-      // 静默
-    }
-  }
+  const { chatMessages, allEntries, worldbookMap, analysisEntries } = await collectAnalysisInputs(worldbookNames);
 
   if (analysisEntries.length === 0) return null;
 
-  const chatMessages = getRecentChatMessages(settings.lore_ai_max_context);
   if (chatMessages.length === 0) return null;
 
   return { chatMessages, entries: analysisEntries, allEntries, worldbookMap };

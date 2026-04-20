@@ -31,8 +31,8 @@
       class="context-refresh"
       :class="{ spinning: ctx.refreshing }"
       :disabled="ctx.refreshing"
-      @click="onRefresh"
       title="刷新上下文"
+      @click="onRefresh"
     >
       🔄
     </button>

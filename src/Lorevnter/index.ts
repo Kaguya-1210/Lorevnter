@@ -101,8 +101,8 @@ $(() => {
 
   // 聊天切换后的冷却窗口（防止历史消息重放误触发自动分析）
   let chatChangeCooldown = false;
-  // 追踪上一次角色名，只有真正切换角色时才重置过滤模式
-  let lastKnownCharName: string | null = null;
+  // 追踪上一次角色作用域键，只有真正切换角色时才重置过滤模式
+  let lastKnownCharacterScopeKey: string | null = null;
 
   // 监听聊天切换
   eventOn(tavern_events.CHAT_CHANGED, (chatFileName) => {
@@ -129,13 +129,18 @@ $(() => {
       }
 
       // 只有角色卡真正变化时才重置过滤模式
-      const currentChar = ctx.context.characterName ?? null;
-      if (lastKnownCharName !== null && currentChar !== lastKnownCharName) {
+      const currentCharacterScopeKey = ctx.context.characterScopeKey ?? null;
+      if (
+        lastKnownCharacterScopeKey !== null &&
+        currentCharacterScopeKey !== lastKnownCharacterScopeKey
+      ) {
         settings.lore_entry_filter_mode = 'all';
         settings.lore_entry_filter_map = {};
-        logger.info(`角色卡切换 (${lastKnownCharName} → ${currentChar})，已重置条目过滤`);
+        logger.info(
+          `角色卡切换 (${lastKnownCharacterScopeKey} → ${currentCharacterScopeKey})，已重置条目过滤`,
+        );
       }
-      lastKnownCharName = currentChar;
+      lastKnownCharacterScopeKey = currentCharacterScopeKey;
     } catch (e) {
       logger.error('聊天切换后刷新上下文失败: ' + (e as Error).message);
     }

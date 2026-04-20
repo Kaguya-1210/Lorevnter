@@ -34,6 +34,7 @@ export const BUILTIN_UPDATE_PRESET: PromptItem[] = [
 3. 条目中存在模糊/笼统的描述，而你能从对话或其他条目中找到具体信息来替换
    例：条目写"成员极少" → 交叉比对其他条目和对话，找到具体成员名单直接填入
 4. 条目附带约束时，严格按约束规则执行
+5. 涉及用户相关的条目（如与用户的关系、对用户的态度、共同经历等），需结合 <user_persona> 中的信息进行更新
 
 你不应该更新的情况：
 - 对话完全没有涉及该条目相关的内容
@@ -48,6 +49,15 @@ export const BUILTIN_UPDATE_PRESET: PromptItem[] = [
 </output_rules>`,
   },
   // ── 中部：弱注意力区 → 数据块 ──
+  {
+    id: 'builtin_update_persona',
+    role: 'user',
+    name: '用户人设',
+    enabled: true,
+    content: `<user_persona>
+{{lore_user_persona}}
+</user_persona>`,
+  },
   {
     id: 'builtin_update_entries',
     role: 'user',
@@ -82,8 +92,14 @@ export const BUILTIN_UPDATE_PRESET: PromptItem[] = [
 - 这个条目记录了什么？和最新剧情（<latest_context>）有关系吗？
 - 对话中有没有新信息要补进去？有没有和现有内容矛盾的地方？
 - 条目里有没有模糊的说法？（如"极少""一些""可能"等）能不能从对话或其他条目里找到具体信息替换掉？
+- 这个条目和用户人设有关系吗？人设里提到了什么相关信息？
 - 有约束吗？约束怎么说的？
 - 要不要改？要改的话，改哪里？
+
+最后分析用户人设本身：
+- 对话中是否出现了与人设矛盾的信息？
+- 是否有新的事实需要更新到人设中？
+- 人设需要修改吗？
 </lore_think>
 
 想完了直接出 JSON。
@@ -97,17 +113,25 @@ export const BUILTIN_UPDATE_PRESET: PromptItem[] = [
       "entryUid": 条目uid数字（从entry标签的uid属性获取）,
       "newContent": "完整的新内容（保留未变化的部分）",
       "reason": "一句话理由"
+    },
+    {
+      "entryName": "__persona__",
+      "entryUid": -1,
+      "newContent": "更新后的完整人设内容",
+      "reason": "人设更新理由"
     }
   ]
 }
 没有要改的就返回：{"updates": []}
+注意：更新用户人设时 entryName 必须为 "__persona__"，entryUid 为 -1
 </output_format>
 
 <final_reminder>
 1. 逐条分析，不跳过
 2. 模糊词必须精确化：交叉比对条目和对话找具体信息
 3. 约束规则最优先
-4. 思考完直接输出 JSON
+4. 用户人设也是分析目标，如有变化请用 entryName="__persona__" 输出
+5. 思考完直接输出 JSON
 </final_reminder>`,
   },
   {

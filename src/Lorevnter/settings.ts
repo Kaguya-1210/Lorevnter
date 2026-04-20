@@ -49,6 +49,8 @@ const PromptPresetSchema = z.object({
 });
 export type PromptPreset = z.infer<typeof PromptPresetSchema>;
 
+const ScanCacheKeySchema = z.string();
+
 // ── 预设业务数据子集 ──
 // 预设只快照这些字段，不包含主题/调试/开关等设置项
 const PresetDataSchema = z.object({
@@ -123,6 +125,10 @@ const LorevnterSettings = z
     // ── 用户人设 ──
     /** 是否在 AI 提示词中附加用户人设 */
     lore_include_persona: z.boolean().default(false),
+    /** 人设绑定的约束 ID（空字符串=无约束） */
+    lore_persona_constraint_id: z.string().default(''),
+    /** 人设绑定所属角色作用域（仅局部约束使用） */
+    lore_persona_constraint_character_id: z.string().default(''),
 
     // ── 新增条目 ──
     /** 新增条目的起始 order（0=自动: max+10） */
@@ -172,8 +178,8 @@ const LorevnterSettings = z
     lore_backup_max_count: z.number().default(5),
 
     // ── SCAN_DONE 缓存（持久化） ──
-    /** key=chatId, value=条目名列表 */
-    lore_scan_cache: z.record(z.string(), z.array(z.string())).default({}),
+    /** key=chatId, value=命中条目标识列表（worldbook.uid） */
+    lore_scan_cache: z.record(z.string(), z.array(ScanCacheKeySchema)).default({}),
     /** key=chatId, value=最后更新时间戳 */
     lore_scan_cache_timestamps: z.record(z.string(), z.number()).default({}),
     /** 缓存清空模式: after_analysis=分析完清空, manual=手动 */

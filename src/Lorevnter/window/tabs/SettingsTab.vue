@@ -7,14 +7,14 @@
       <label class="st-row">
         <div class="st-row-main">
           <span class="st-label">启用 AI 分析</span>
-          <input type="checkbox" v-model="settings.lore_plugin_enabled" class="ios-toggle" />
+          <input v-model="settings.lore_plugin_enabled" type="checkbox" class="ios-toggle" />
         </div>
       </label>
 
       <label class="st-row">
         <div class="st-row-main">
           <span class="st-label">调试模式</span>
-          <input type="checkbox" v-model="settings.lore_debug_mode" class="ios-toggle" />
+          <input v-model="settings.lore_debug_mode" type="checkbox" class="ios-toggle" />
         </div>
         <span class="st-hint">开启后显示调试标签页，输出详细日志</span>
       </label>
@@ -62,6 +62,35 @@
           </select>
           <button class="st-btn" :disabled="!selectedWb" @click="addWorldbook">+ 添加</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 世界书备份 -->
+    <div class="st-group">
+      <div class="st-group-title">世界书备份</div>
+
+      <label class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">自动备份</span>
+          <input v-model="settings.lore_backup_enabled" type="checkbox" class="ios-toggle" />
+        </div>
+        <span class="st-hint">AI 分析写入前自动备份当前世界书</span>
+      </label>
+
+      <div v-if="settings.lore_backup_enabled" class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">备份间隔</span>
+          <input v-model.number="settings.lore_backup_interval" type="number" class="st-number" min="1" max="99" />
+        </div>
+        <span class="st-hint">每 N 次 AI 分析后自动备份（1 = 每次都备份）</span>
+      </div>
+
+      <div v-if="settings.lore_backup_enabled" class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">最大保留数</span>
+          <input v-model.number="settings.lore_backup_max_count" type="number" class="st-number" min="1" max="50" />
+        </div>
+        <span class="st-hint">每本世界书最多保留几份备份，超出自动淘汰最早的</span>
       </div>
     </div>
 

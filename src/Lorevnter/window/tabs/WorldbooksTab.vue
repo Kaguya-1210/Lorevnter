@@ -16,14 +16,14 @@
       <div class="wb-section-header" @click="showBackups = !showBackups">
         <span>{{ showBackups ? '▼' : '▶' }}</span>
         <span class="wb-section-title" style="margin-bottom:0">📦 备份管理</span>
-        <span class="wb-backup-badge" v-if="backupList.length">{{ backupList.length }}</span>
+        <span v-if="backupList.length" class="wb-backup-badge">{{ backupList.length }}</span>
       </div>
       <div v-if="showBackups" class="wb-backup-body">
         <div class="wb-backup-toolbar">
           <button class="wb-btn" @click="onManualBackup">💾 手动备份</button>
           <button class="wb-btn" @click="onImportBackup">📥 导入</button>
-          <button class="wb-btn" @click="onExportAllBackups" :disabled="backupList.length === 0">📤 导出全部</button>
-          <button class="wb-btn wb-btn-danger" @click="onClearAllBackups" :disabled="backupList.length === 0">🗑 清空</button>
+          <button class="wb-btn" :disabled="backupList.length === 0" @click="onExportAllBackups">📤 导出全部</button>
+          <button class="wb-btn wb-btn-danger" :disabled="backupList.length === 0" @click="onClearAllBackups">🗑 清空</button>
         </div>
         <input ref="importFileRef" type="file" accept=".json" style="display:none" @change="onImportFileSelected" />
 
@@ -35,8 +35,8 @@
               <span class="wb-backup-meta">{{ bk.entryCount }} 条 · {{ formatBackupTime(bk.timestamp) }} · {{ bk.triggerType === 'auto' ? '自动' : '手动' }}</span>
             </div>
             <div class="wb-backup-actions">
-              <button class="wb-mini-btn" @click="onRestoreBackup(bk)" title="还原">↩</button>
-              <button class="wb-mini-btn wb-mini-danger" @click="onDeleteBackup(bk)" title="删除">✕</button>
+              <button class="wb-mini-btn" title="还原" @click="onRestoreBackup(bk)">↩</button>
+              <button class="wb-mini-btn wb-mini-danger" title="删除" @click="onDeleteBackup(bk)">✕</button>
             </div>
           </div>
         </div>

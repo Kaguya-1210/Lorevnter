@@ -40,7 +40,7 @@ function tokenize(text: string): string[] {
   let current = '';
   for (let i = 0; i < text.length; i++) {
     current += text[i];
-    if (/[，。！？；\n,.!?;：、（）「」『』""''《》【】\-\)\(]/.test(text[i])) {
+    if (/[，。！？；\n,.!?;：、（）「」『』""''《》【】\-()]/.test(text[i])) {
       tokens.push(current);
       current = '';
     }
@@ -263,6 +263,25 @@ function injectStyles(doc: Document): void {
 .lre-diff-hint {
   font-size: 11px; color: #666; margin-top: 6px;
 }
+.lre-think-box {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--SmartThemeBorderColor,#333);
+  border-radius: 8px;
+  background: rgba(10,132,255,0.08);
+}
+.lre-think-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #7fb7ff;
+  margin-bottom: 4px;
+}
+.lre-think-text {
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 
 /* 底部 */
 .lre-footer {
@@ -383,10 +402,18 @@ export function openReviewEditor(
   /** 渲染内联 diff 面板 */
   function buildDiffPanel(idx: number): string {
     const item = updates[idx];
+    const thinkBlock = item.think?.trim()
+      ? `
+        <div class="lre-think-box">
+          <div class="lre-think-title">AI THINK</div>
+          <div class="lre-think-text">${esc(item.think)}</div>
+        </div>`
+      : '';
 
     if (item.action === 'create') {
       return `
         <div class="lre-diff-panel">
+          ${thinkBlock}
           <div class="lre-create-editor" contenteditable="true" data-create-idx="${idx}">${esc(item.newContent)}</div>
           <div class="lre-diff-hint">💡 新建条目，直接编辑上方内容</div>
         </div>`;
@@ -395,7 +422,7 @@ export function openReviewEditor(
     const blocks = itemDiffBlocks.get(idx);
     if (!blocks) return '';
 
-    let html = '<div class="lre-diff-panel"><div class="lre-diff-content">';
+    let html = `<div class="lre-diff-panel">${thinkBlock}<div class="lre-diff-content">`;
     const changeCount = blocks.filter(b => b.type === 'diff').length;
 
     blocks.forEach((block, bi) => {

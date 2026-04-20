@@ -7,9 +7,9 @@
         <span class="debug-section-title">🩺 系统自检</span>
         <button
           class="debug-action-btn"
-          @click.stop="startDiagnostics"
           :disabled="selfCheckStore.isRunning"
           :title="selfCheckStore.isRunning ? '自检中...' : '开始自检'"
+          @click.stop="startDiagnostics"
         >{{ selfCheckStore.isRunning ? '⏳' : '▶️' }}</button>
       </div>
       <div v-if="showSelfCheck" class="debug-section-body">
@@ -102,7 +102,7 @@
       <div class="debug-section-header" @click="showContext = !showContext">
         <span class="debug-section-icon">{{ showContext ? '▼' : '▶' }}</span>
         <span class="debug-section-title">上下文快照</span>
-        <button class="debug-action-btn" @click.stop="onRefreshContext" title="刷新">🔄</button>
+        <button class="debug-action-btn" title="刷新" @click.stop="onRefreshContext">🔄</button>
       </div>
       <div v-if="showContext" class="debug-section-body">
         <div class="debug-kv">
@@ -159,7 +159,7 @@
       <div class="debug-section-header" @click="showAiHistory = !showAiHistory">
         <span class="debug-section-icon">{{ showAiHistory ? '▼' : '▶' }}</span>
         <span class="debug-section-title">AI 调用历史 ({{ runtime.aiCallHistory.length }})</span>
-        <button class="debug-action-btn" @click.stop="onClearAiHistory" title="清空">🗑</button>
+        <button class="debug-action-btn" title="清空" @click.stop="onClearAiHistory">🗑</button>
       </div>
       <div v-if="showAiHistory" class="debug-section-body">
         <div v-if="runtime.aiCallHistory.length === 0" class="debug-empty">暂无 AI 调用记录</div>
@@ -185,7 +185,7 @@
           </div>
           <!-- AI 原始响应 -->
           <div v-if="call.rawResponse" class="debug-ai-raw">
-            <button class="debug-action-btn" @click="toggleRawResponse(i)" style="font-size:12px;">{{ expandedRaw[i] ? '▼ 收起原始响应' : '▶ 查看原始响应' }}</button>
+            <button class="debug-action-btn" style="font-size:12px;" @click="toggleRawResponse(i)">{{ expandedRaw[i] ? '▼ 收起原始响应' : '▶ 查看原始响应' }}</button>
             <pre v-if="expandedRaw[i]" class="debug-prompt-content" style="max-height:200px;overflow-y:auto;margin-top:6px;">{{ call.rawResponse }}</pre>
           </div>
           <!-- API 配置快照（调试模式下采集） -->
@@ -208,7 +208,7 @@
       <div class="debug-section-header" @click="showPromptPreview = !showPromptPreview">
         <span class="debug-section-icon">{{ showPromptPreview ? '▼' : '▶' }}</span>
         <span class="debug-section-title">🔬 管线预览</span>
-        <button class="debug-action-btn" @click.stop="onBuildPreview" title="运行管线预览（不调用AI）" :disabled="previewLoading">
+        <button class="debug-action-btn" title="运行管线预览（不调用AI）" :disabled="previewLoading" @click.stop="onBuildPreview">
           {{ previewLoading ? '⏳' : '▶️' }}
         </button>
       </div>
@@ -258,9 +258,9 @@
         <span class="debug-section-icon">{{ showLogs ? '▼' : '▶' }}</span>
         <span class="debug-section-title">操作日志 ({{ runtime.logEntries.length }})</span>
         <div class="debug-log-actions">
-          <button class="debug-action-btn" @click.stop="onRefreshLogs" title="刷新">🔄</button>
-          <button class="debug-action-btn" @click.stop="onClearLogs" title="清空">🗑</button>
-          <button class="debug-action-btn" @click.stop="onExportDebug" title="导出">📋</button>
+          <button class="debug-action-btn" title="刷新" @click.stop="onRefreshLogs">🔄</button>
+          <button class="debug-action-btn" title="清空" @click.stop="onClearLogs">🗑</button>
+          <button class="debug-action-btn" title="导出" @click.stop="onExportDebug">📋</button>
         </div>
       </div>
       <div v-if="showLogs" class="debug-section-body">
@@ -322,17 +322,17 @@
         </div>
 
         <!-- 目标世界书选择 -->
-        <div class="st-row" v-if="!testSnapshotInfo">
+        <div v-if="!testSnapshotInfo" class="st-row">
           <div class="st-row-main">
             <span class="st-label">目标世界书</span>
-            <button class="debug-action-btn" @click="refreshTestWorldbooks" title="刷新列表">🔄</button>
+            <button class="debug-action-btn" title="刷新列表" @click="refreshTestWorldbooks">🔄</button>
           </div>
           <select v-model="testTargetWorldbook" class="st-select st-select-full">
             <option value="" disabled>请选择世界书</option>
             <option v-for="wb in testWorldbookList" :key="wb" :value="wb">{{ wb }}</option>
           </select>
         </div>
-        <div class="st-row" v-if="!testSnapshotInfo">
+        <div v-if="!testSnapshotInfo" class="st-row">
           <button class="st-btn st-btn-test" :disabled="testBusy || !testTargetWorldbook" @click="onTestWrite">
             {{ testBusy ? '⏳ 写入中...' : '🧪 执行测试写入' }}
           </button>
@@ -348,7 +348,7 @@
             :class="act.success ? 'test-ok' : 'test-fail'"
           >
             <span class="test-result-icon">{{ act.success ? '✓' : '✕' }}</span>
-            <span class="test-result-action">{{ act.action === 'modify' ? '修改' : '新增' }}</span>
+            <span class="test-result-action">{{ act.action === 'modify' ? '修改' : act.action === 'append' ? '追加' : '新增' }}</span>
             <span class="test-result-name">{{ act.entryName }}</span>
             <span class="test-result-uid">uid: {{ act.uid }}</span>
             <span class="test-result-detail">{{ act.detail }}</span>
@@ -359,6 +359,24 @@
         <div class="st-row" style="margin-top:8px;border-top:1px solid var(--lore-border);padding-top:8px">
           <span class="st-hint">💡 点击「🧪 执行测试写入」后会先弹出审核弹窗，确认后才写入。审核通过的条目支持回档恢复。</span>
         </div>
+
+        <!-- 人设读写测试 -->
+        <div style="margin-top:12px;border-top:1px solid var(--lore-border);padding-top:10px">
+          <div class="debug-key" style="margin-bottom:8px">👤 人设读写测试</div>
+
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="st-btn" @click="onPreviewPersona">📖 读取人设</button>
+            <button class="st-btn st-btn-test" :disabled="personaTestBusy" @click="onTestPersona">
+              {{ personaTestBusy ? '⏳' : '🧪 人设测试' }}
+            </button>
+            <button v-if="personaBackup !== null" class="st-btn st-btn-danger" :disabled="personaTestBusy" @click="onRestorePersona">
+              ↩️ 还原人设
+            </button>
+          </div>
+          <span class="st-hint" style="margin-top:6px;display:block">模拟追加或修改人设，走审核弹窗后写入</span>
+
+          <div v-if="personaPreviewText" class="debug-raw-block" style="margin-top:8px;max-height:160px;overflow:auto;white-space:pre-wrap;font-size:12px">{{ personaPreviewText }}</div>
+        </div>
       </div>
     </div>
 
@@ -367,7 +385,7 @@
       <div class="debug-section-header" @click="showCacheInfo = !showCacheInfo">
         <span class="debug-section-icon">{{ showCacheInfo ? '▼' : '▶' }}</span>
         <span class="debug-section-title">📦 条目缓存</span>
-        <button class="debug-action-btn" @click.stop="onRefreshCache" title="刷新缓存信息">🔄</button>
+        <button class="debug-action-btn" title="刷新缓存信息" @click.stop="onRefreshCache">🔄</button>
       </div>
       <div v-if="showCacheInfo" class="debug-section-body">
         <div class="debug-kv-item">
@@ -407,8 +425,9 @@ import { buildOnePassPrompts, testApiConnection, getApiSnapshot } from '../../co
 import { useSelfCheckStore } from '../../stores/selfCheckStore';
 import * as WorldbookAPI from '../../core/worldbook-api';
 import { runTestWrite, rollbackTestWrite, discardTestSnapshot, getTestSnapshotInfo, getAvailableWorldbooks, type TestActionResult } from '../../core/test-mode';
-import { getCacheStats, getCachedEntryNames } from '../../core/scan-cache';
+import { getCacheStats, getCachedEntryLabels } from '../../core/scan-cache';
 import { openReviewEditor } from '../../core/review-editor';
+import { getPersonaPreview, getPersonaRaw, setUserPersona } from '../../core/persona';
 import type { ReviewUpdate } from '../../core/review-types';
 
 const runtime = useRuntimeStore();
@@ -481,22 +500,112 @@ function onDiscardSnapshot() {
   toastr.info('快照已丢弃，测试数据已保留', 'Lorevnter');
 }
 
+// ── 人设测试 ──
+const personaTestBusy = ref(false);
+const personaPreviewText = ref('');
+const personaBackup = ref<string | null>(null);
+
+function onPreviewPersona() {
+  const preview = getPersonaPreview();
+  if (!preview) {
+    personaPreviewText.value = '（人设为空）';
+    toastr.info('当前无人设数据', 'Lorevnter');
+    return;
+  }
+  personaPreviewText.value = `用户名: ${preview.name}\n\n${preview.description}`;
+  toastr.success(`已读取人设 (${preview.description.length} 字符)`, 'Lorevnter');
+}
+
+/** 人设测试：同时构造追加+修改两条 ReviewUpdate，走审核弹窗 */
+function onTestPersona() {
+  const current = getPersonaRaw();
+  if (!current.trim()) {
+    toastr.warning('当前人设为空，请先设置人设后再测试', 'Lorevnter');
+    return;
+  }
+
+  const timestamp = new Date().toLocaleTimeString();
+  const reviewUpdates: ReviewUpdate[] = [];
+
+  // 修改测试：首行末尾添加标记
+  const lines = current.split('\n');
+  lines[0] = `${lines[0]} [Lorevnter 修改测试 ${timestamp}]`;
+  reviewUpdates.push({
+    entryName: '用户人设（修改）',
+    originalContent: current,
+    newContent: lines.join('\n'),
+    reason: '测试修改：在首行末尾加了几个字',
+    approved: null,
+    action: 'modify',
+    uid: -1,
+    worldbook: '__persona__',
+  });
+
+  // 追加测试：末尾追加一段
+  const appendContent = current + `\n\n【Lorevnter 追加测试 ${timestamp}】这是一段测试追加的内容。`;
+  reviewUpdates.push({
+    entryName: '用户人设（追加）',
+    originalContent: current,
+    newContent: appendContent,
+    reason: '测试追加：在人设末尾添加测试标记',
+    approved: null,
+    action: 'append',
+    uid: -1,
+    worldbook: '__persona__',
+  });
+
+  personaBackup.value = current;
+  openReviewEditor(reviewUpdates, async (approved) => {
+    let successCount = 0;
+    for (const item of approved) {
+      const ok = setUserPersona(item.newContent);
+      if (ok) {
+        personaPreviewText.value = item.newContent;
+        successCount++;
+      } else {
+        toastr.error(`人设写入失败: ${item.entryName}`, 'Lorevnter');
+      }
+    }
+    if (successCount > 0) {
+      toastr.success(`人设测试写入成功（${successCount}/${approved.length} 条）`, 'Lorevnter');
+    }
+  }, () => {
+    personaBackup.value = null;
+  });
+}
+
+function onRestorePersona() {
+  if (personaBackup.value === null) return;
+  if (!confirm('确认还原人设为测试写入前的状态？')) return;
+  const ok = setUserPersona(personaBackup.value);
+  if (ok) {
+    personaPreviewText.value = personaBackup.value || '（人设为空）';
+    personaBackup.value = null;
+    toastr.success('人设已还原', 'Lorevnter');
+  } else {
+    toastr.error('还原失败', 'Lorevnter');
+  }
+}
+
 
 
 // ── 缓存信息 ──
 const cacheStats = ref(getCacheStats());
-const cachedNames = ref<string[]>(getCachedEntryNames());
+const cachedNames = ref<string[]>(getCachedEntryLabels());
 
 function onRefreshCache() {
   cacheStats.value = getCacheStats();
-  cachedNames.value = getCachedEntryNames();
+  cachedNames.value = getCachedEntryLabels();
   toastr.info('缓存信息已刷新', 'Lorevnter');
 }
 
 // ── 快速信息 ──
 const apiSnapshot = ref<ReturnType<typeof getApiSnapshot> | null>(null);
 const currentChatId = computed(() => getCurrentChatId());
-const currentAiReplyCount = computed(() => getAiReplyCount());
+const currentAiReplyCount = computed(() => {
+  const chatId = getCurrentChatId();
+  return chatId ? (settings.lore_ai_reply_counts[chatId] ?? 0) : 0;
+});
 const remainingToTrigger = computed(() => {
   const count = currentAiReplyCount.value;
   const interval = settings.lore_scan_interval;
