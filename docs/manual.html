@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lorevnter 使用手册</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-hover: #1a1a26;
+      --bg-code: #1a1a2e;
+      --border: #2a2a3e;
+      --border-accent: #4a4aff30;
+      --text: #e8e8f0;
+      --text-secondary: #8888a8;
+      --text-muted: #5a5a78;
+      --accent: #6c5ce7;
+      --accent-light: #a29bfe;
+      --accent-glow: #6c5ce740;
+      --success: #00b894;
+      --warning: #fdcb6e;
+      --danger: #e17055;
+      --info: #74b9ff;
+      --gradient-1: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      --gradient-2: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+      --shadow-glow: 0 0 40px rgba(108,92,231,0.15);
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      scrollbar-width: thin;
+      scrollbar-color: var(--accent) var(--bg);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative;
+      min-height: 60vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 24px 60px;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      animation: pulse 4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
+      50% { opacity: 0.8; transform: translateX(-50%) scale(1.1); }
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border-radius: 100px;
+      background: var(--accent-glow);
+      border: 1px solid var(--border-accent);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent-light);
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 6vw, 4rem);
+      font-weight: 700;
+      background: var(--gradient-1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--text-secondary);
+      max-width: 600px;
+      position: relative;
+    }
+
+    /* ── Nav ── */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(20px) saturate(180%);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+
+    .nav-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding: 12px 0;
+    }
+
+    .nav-inner::-webkit-scrollbar { display: none; }
+
+    .nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 100px;
+      white-space: nowrap;
+      transition: var(--transition);
+    }
+
+    .nav a:hover, .nav a.active {
+      color: var(--text);
+      background: var(--accent-glow);
+    }
+
+    /* ── Main ── */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px 120px;
+    }
+
+    /* ── Section ── */
+    .section {
+      margin-top: 72px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .section-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: var(--gradient-1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .section-header h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 20px;
+      transition: var(--transition);
+    }
+
+    .card:hover {
+      border-color: var(--border-accent);
+      box-shadow: var(--shadow-glow);
+      transform: translateY(-2px);
+    }
+
+    .card h3 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card p, .card li {
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+    }
+
+    .card ul, .card ol {
+      padding-left: 20px;
+      margin-top: 8px;
+    }
+
+    .card li {
+      margin-bottom: 6px;
+    }
+
+    .card li::marker {
+      color: var(--accent-light);
+    }
+
+    /* ── Steps ── */
+    .steps {
+      counter-reset: step;
+    }
+
+    .step {
+      position: relative;
+      padding-left: 64px;
+      margin-bottom: 36px;
+    }
+
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: var(--gradient-1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .step::after {
+      content: '';
+      position: absolute;
+      left: 20px;
+      top: 50px;
+      bottom: -28px;
+      width: 2px;
+      background: var(--border);
+    }
+
+    .step:last-child::after { display: none; }
+
+    .step h4 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .step p {
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+    }
+
+    /* ── Code ── */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85em;
+      background: var(--bg-code);
+      padding: 2px 8px;
+      border-radius: 6px;
+      color: var(--accent-light);
+      border: 1px solid var(--border);
+    }
+
+    pre {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      overflow-x: auto;
+      margin: 16px 0;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--text);
+    }
+
+    /* ── Table ── */
+    .table-wrap {
+      overflow-x: auto;
+      margin: 16px 0;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    th {
+      background: var(--bg-code);
+      font-weight: 600;
+      text-align: left;
+      padding: 12px 16px;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 10px 16px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    tr:hover td {
+      background: var(--bg-card-hover);
+    }
+
+    /* ── Tags ── */
+    .tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .tag-prompt { background: #6c5ce720; color: var(--accent-light); }
+    .tag-skip { background: #e1705520; color: var(--danger); }
+    .tag-macro { background: #00b89420; color: var(--success); }
+
+    /* ── Callout ── */
+    .callout {
+      padding: 16px 20px;
+      border-radius: var(--radius-sm);
+      margin: 16px 0;
+      font-size: 0.9rem;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .callout-icon { font-size: 1.2em; flex-shrink: 0; margin-top: 2px; }
+
+    .callout-tip {
+      background: #00b89410;
+      border-left: 3px solid var(--success);
+      color: var(--success);
+    }
+
+    .callout-warn {
+      background: #fdcb6e10;
+      border-left: 3px solid var(--warning);
+      color: var(--warning);
+    }
+
+    .callout-info {
+      background: #74b9ff10;
+      border-left: 3px solid var(--info);
+      color: var(--info);
+    }
+
+    /* ── Accordion ── */
+    .accordion {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .accordion summary {
+      padding: 14px 20px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.95rem;
+      background: var(--bg-card);
+      transition: var(--transition);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .accordion summary::before {
+      content: '▸';
+      font-size: 14px;
+      color: var(--accent-light);
+      transition: transform 0.2s;
+    }
+
+    .accordion[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    .accordion summary:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .accordion-body {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    /* ── Flow Diagram ── */
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 24px 0;
+    }
+
+    .flow-node {
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .flow-arrow {
+      color: var(--accent-light);
+      font-size: 1.2rem;
+      padding: 0 4px;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer a {
+      color: var(--accent-light);
+      text-decoration: none;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .hero { min-height: 40vh; padding: 60px 16px 40px; }
+      .container { padding: 0 16px 80px; }
+      .card { padding: 20px; }
+      .step { padding-left: 52px; }
+      .flow-node { font-size: 0.75rem; padding: 8px 12px; }
+    }
+
+    /* ── Back to Top ── */
+    .back-top {
+      position: fixed;
+      bottom: 32px;
+      right: 32px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--gradient-1);
+      border: none;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: var(--transition);
+      z-index: 50;
+      box-shadow: var(--shadow);
+    }
+
+    .back-top.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-badge">📘 使用手册 · v0.1.0</div>
+  <h1>Lorevnter</h1>
+  <p>AI 驱动的 SillyTavern 世界书自动管理插件<br>让你的世界观数据随剧情自动进化</p>
+</div>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#install">安装</a>
+    <a href="#quickstart">快速上手</a>
+    <a href="#pipeline">工作原理</a>
+    <a href="#constraints">约束系统</a>
+    <a href="#macros">宏系统</a>
+    <a href="#prompts">提示词编辑</a>
+    <a href="#review">审核机制</a>
+    <a href="#persona">用户人设</a>
+    <a href="#filter">条目过滤</a>
+    <a href="#cache">缓存管理</a>
+    <a href="#backup">备份与回档</a>
+    <a href="#debug">调试面板</a>
+    <a href="#faq">常见问题</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- Install -->
+  <div class="section" id="install">
+    <div class="section-header">
+      <div class="section-icon">📦</div>
+      <h2>安装</h2>
+    </div>
+    <div class="card">
+      <div class="steps">
+        <div class="step">
+          <h4>下载插件</h4>
+          <p>从 GitHub 仓库下载 Lorevnter 最新版本的 Release 压缩包或直接 Clone 仓库。</p>
+        </div>
+        <div class="step">
+          <h4>放置文件</h4>
+          <p>将 <code>dist/Lorevnter/</code> 文件夹复制到 SillyTavern 的<br><code>data/default-user/scripts/</code> 目录下。</p>
+        </div>
+        <div class="step">
+          <h4>重启酒馆</h4>
+          <p>重启 SillyTavern，顶部工具栏出现 <strong>Lorevnter</strong> 按钮即安装成功。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quickstart -->
+  <div class="section" id="quickstart">
+    <div class="section-header">
+      <div class="section-icon">🚀</div>
+      <h2>快速上手</h2>
+    </div>
+
+    <div class="card">
+      <div class="steps">
+        <div class="step">
+          <h4>打开插件窗口</h4>
+          <p>点击顶部工具栏的 <strong>Lorevnter</strong> 按钮，或在聊天框输入 <code>/lore</code>。</p>
+        </div>
+        <div class="step">
+          <h4>确认世界书识别</h4>
+          <p>窗口底部的状态栏会显示当前角色卡绑定的世界书。确保你的角色卡正确配置了世界书。</p>
+        </div>
+        <div class="step">
+          <h4>设置约束（推荐）</h4>
+          <p>在「约束管理」页签中为条目创建约束。约束告诉 AI 你想要怎样更新这个条目——比如"记录能力值变化"或"跟踪人际关系发展"。</p>
+        </div>
+        <div class="step">
+          <h4>配置触发方式</h4>
+          <p>在「AI 配置」页签设置自动触发间隔（每 N 轮 AI 回复后自动分析），或选择手动模式。</p>
+        </div>
+        <div class="step">
+          <h4>开始游玩</h4>
+          <p>正常聊天即可。AI 会在合适时机分析剧情变化并弹出修改建议。审核通过后自动写入世界书。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pipeline -->
+  <div class="section" id="pipeline">
+    <div class="section-header">
+      <div class="section-icon">⚙️</div>
+      <h2>工作原理</h2>
+    </div>
+
+    <div class="card">
+      <h3>管线流程</h3>
+      <p>Lorevnter 的核心是一条自动化管线，每次触发时按以下步骤执行：</p>
+      <div class="flow">
+        <div class="flow-node">触发分析</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node">自动备份</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node">收集条目</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node">提取正文</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node">AI 分析</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node">审核确认</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node">写入世界书</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>触发方式</h3>
+      <div class="table-wrap">
+        <table>
+          <tr><th>方式</th><th>说明</th></tr>
+          <tr><td><strong>自动</strong></td><td>每 N 轮 AI 回复后自动触发（在 AI 配置中设置间隔）</td></tr>
+          <tr><td><strong>手动</strong></td><td>在世界书页签点击「🔍 AI 分析」按钮</td></tr>
+          <tr><td><strong>斜杠命令</strong></td><td>在聊天框输入 <code>/lore</code> 打开插件窗口后手动触发</td></tr>
+        </table>
+      </div>
+      <div class="callout callout-tip">
+        <span class="callout-icon">💡</span>
+        <span>建议从间隔 3-5 轮开始，根据剧情节奏调整。高频分析消耗更多 API 额度但信息更及时。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Constraints -->
+  <div class="section" id="constraints">
+    <div class="section-header">
+      <div class="section-icon">🔒</div>
+      <h2>约束系统</h2>
+    </div>
+
+    <div class="card">
+      <h3>什么是约束？</h3>
+      <p>约束是你给 AI 的<strong>条目级指令</strong>。每个约束可以绑定到一个或多个世界书条目，告诉 AI 在分析该条目时应该遵循的规则。</p>
+    </div>
+
+    <div class="card">
+      <h3>约束类型</h3>
+      <div class="table-wrap">
+        <table>
+          <tr><th>类型</th><th>标签</th><th>作用</th></tr>
+          <tr><td><strong>提示词约束</strong></td><td><span class="tag tag-prompt">PROMPT</span></td><td>告诉 AI 如何处理该条目（记录什么、格式要求、更新策略等）</td></tr>
+          <tr><td><strong>跳过约束</strong></td><td><span class="tag tag-skip">SKIP</span></td><td>标记条目不参与 AI 分析（固定设定、模板类条目）</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>约束作用域</h3>
+      <div class="table-wrap">
+        <table>
+          <tr><th>作用域</th><th>说明</th></tr>
+          <tr><td><strong>全局</strong></td><td>所有角色卡通用，切换角色不影响</td></tr>
+          <tr><td><strong>局部</strong></td><td>仅对创建时的角色卡生效，切换角色时自动隔离</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>约束编写示例</h3>
+
+      <details class="accordion">
+        <summary>角色能力值追踪</summary>
+        <div class="accordion-body">
+          <pre><code>记录 {{char}} 的能力值变化和状态数据。
+当正文中出现能力值、等级、HP、MP 等数值变化时，更新对应字段。
+可以自由扩展条目，添加新发现的能力和技能。
+格式要求：使用「属性名: 数值」的格式。</code></pre>
+        </div>
+      </details>
+
+      <details class="accordion">
+        <summary>人际关系记录</summary>
+        <div class="accordion-body">
+          <pre><code>追踪 {{char}} 与其他角色之间的关系发展。
+记录关系变化的原因和具体事件。
+包括好感度、信任度等定性描述。
+新出现的重要 NPC 应新增关系条目。</code></pre>
+        </div>
+      </details>
+
+      <details class="accordion">
+        <summary>世界设定记录</summary>
+        <div class="accordion-body">
+          <pre><code>记录该地点/组织的最新状态。
+关注：成员变动、势力范围、重大事件、政策变化。
+保持条目简洁，只记录已确认的事实。</code></pre>
+        </div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h3>约束优先级</h3>
+      <p>当约束与系统默认策略冲突时，<strong>约束始终优先</strong>。优先级从高到低：</p>
+      <ol>
+        <li>输出格式规则（必须输出有效 JSON）</li>
+        <li>数据安全规则（不丢失未变化的内容）</li>
+        <li><strong>局部约束</strong>（角色卡级）</li>
+        <li><strong>全局约束</strong>（跨角色卡）</li>
+        <li>默认更新策略</li>
+      </ol>
+      <div class="callout callout-info">
+        <span class="callout-icon">ℹ️</span>
+        <span>约束说"自由扩展"，AI 就会执行扩展——即使默认策略倾向保守。约束的力量高于一切默认行为。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Macros -->
+  <div class="section" id="macros">
+    <div class="section-header">
+      <div class="section-icon">🏷️</div>
+      <h2>宏系统</h2>
+    </div>
+
+    <div class="card">
+      <h3>内置宏</h3>
+      <p>在约束文本和提示词模板中，可以使用以下宏：</p>
+      <div class="table-wrap">
+        <table>
+          <tr><th>宏</th><th>说明</th><th>使用场景</th></tr>
+          <tr><td><code>{{char}}</code></td><td>当前角色名</td><td>约束、提示词</td></tr>
+          <tr><td><code>{{user}}</code></td><td>用户名</td><td>约束、提示词</td></tr>
+          <tr><td><code>{{lore_entries}}</code></td><td>待分析条目列表</td><td>提示词模板</td></tr>
+          <tr><td><code>{{lore_context}}</code></td><td>聊天正文（提取后）</td><td>提示词模板</td></tr>
+          <tr><td><code>{{lore_constraints}}</code></td><td>所有约束规则</td><td>提示词模板</td></tr>
+          <tr><td><code>{{lore_user_persona}}</code></td><td>用户人设</td><td>提示词模板</td></tr>
+          <tr><td><code>{{lore_constraint_policy}}</code></td><td>约束优先级规则</td><td>提示词模板</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>条目级宏 <span class="tag tag-macro">CUSTOM</span></h3>
+      <p>你可以为约束设置 <strong>macro</strong> 字段，创建条目级别的短标签别名。在提示词模板中通过 <code>{{别名}}</code> 引用条目内容。</p>
+      <p style="margin-top: 12px;">例如：为角色「沙赫尔」的约束设置 macro 为 <code>shr</code>，即可在任何提示词中用 <code>{{shr}}</code> 引用该条目的完整内容。</p>
+    </div>
+  </div>
+
+  <!-- Prompts -->
+  <div class="section" id="prompts">
+    <div class="section-header">
+      <div class="section-icon">✏️</div>
+      <h2>提示词编辑</h2>
+    </div>
+
+    <div class="card">
+      <h3>提示词结构</h3>
+      <p>发送给 AI 的提示词由以下部分组成（按顺序）：</p>
+      <div class="table-wrap">
+        <table>
+          <tr><th>#</th><th>角色</th><th>内容</th></tr>
+          <tr><td>1</td><td><code>system</code></td><td>系统规则 + 约束 + 决策规则</td></tr>
+          <tr><td>2</td><td><code>user</code></td><td>用户人设数据</td></tr>
+          <tr><td>3</td><td><code>user</code></td><td>世界书条目列表</td></tr>
+          <tr><td>4</td><td><code>user</code></td><td>聊天正文</td></tr>
+          <tr><td>5</td><td><code>user</code></td><td>CoT 思考指令</td></tr>
+          <tr><td>6</td><td><code>assistant</code></td><td>CoT 锚定（引导开始思考）</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>自定义提示词</h3>
+      <p>在「预设管理」页签中可以管理提示词预设。每个预设包含多个 Prompt Item，你可以：</p>
+      <ul>
+        <li>调整每个 Item 的角色（system / user / assistant）</li>
+        <li>编辑内容模板，使用宏动态注入数据</li>
+        <li>拖拽排序、启用/禁用单个 Item</li>
+        <li>创建多个预设并快速切换</li>
+      </ul>
+      <div class="callout callout-warn">
+        <span class="callout-icon">⚠️</span>
+        <span>修改提示词需要了解 AI 的 prompt 工程原理。建议在调试面板的「管线预览」中查看最终发送的内容，确认修改效果。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Review -->
+  <div class="section" id="review">
+    <div class="section-header">
+      <div class="section-icon">✅</div>
+      <h2>审核机制</h2>
+    </div>
+
+    <div class="card">
+      <h3>审核流程</h3>
+      <p>AI 分析完成后会弹出审核面板，每条修改建议包含：</p>
+      <ul>
+        <li><strong>条目名</strong> — 要修改哪个条目</li>
+        <li><strong>操作类型</strong> — 修改 / 追加 / 新增</li>
+        <li><strong>AI 理由</strong> — 为什么要这样改</li>
+        <li><strong>Diff 对比</strong> — 展开查看逐行差异（红色=删除，绿色=新增）</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>审核操作</h3>
+      <div class="table-wrap">
+        <table>
+          <tr><th>操作</th><th>说明</th></tr>
+          <tr><td>✅ 通过</td><td>确认该条修改</td></tr>
+          <tr><td>❌ 拒绝</td><td>拒绝该条修改</td></tr>
+          <tr><td>全部通过</td><td>一键通过所有待审核项</td></tr>
+          <tr><td>确认执行</td><td>将所有已通过的修改写入世界书</td></tr>
+          <tr><td>取消</td><td>放弃所有修改</td></tr>
+        </table>
+      </div>
+      <div class="callout callout-tip">
+        <span class="callout-icon">💡</span>
+        <span>调试模式下会强制开启审核，即使全局审核开关关闭。建议初期开启审核以建立信任。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Persona -->
+  <div class="section" id="persona">
+    <div class="section-header">
+      <div class="section-icon">👤</div>
+      <h2>用户人设</h2>
+    </div>
+
+    <div class="card">
+      <h3>人设处理功能</h3>
+      <p>在「AI 配置」页签中开启「用户人设处理」后，AI 分析时会：</p>
+      <ul>
+        <li>读取酒馆的用户 Persona 信息</li>
+        <li>将其作为 <code>&lt;user_persona&gt;</code> 标签注入提示词</li>
+        <li>AI 可以提出人设更新建议（以 <code>__persona__</code> 条目名输出）</li>
+        <li>审核通过后自动写回酒馆的 Persona 设置</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>人设约束绑定</h3>
+      <p>在「约束管理」页签中，选中一个约束后可以点击「绑定人设」按钮，将该约束作为人设处理的专属规则。</p>
+      <div class="callout callout-info">
+        <span class="callout-icon">ℹ️</span>
+        <span>系统默认规则会限制人设更新的范围——只记录用户自身的稳定设定和长期偏好，不会写入他人状态或世界设定。约束可以覆盖此行为。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="section" id="filter">
+    <div class="section-header">
+      <div class="section-icon">🔍</div>
+      <h2>条目过滤</h2>
+    </div>
+
+    <div class="card">
+      <h3>过滤模式</h3>
+      <div class="table-wrap">
+        <table>
+          <tr><th>模式</th><th>说明</th></tr>
+          <tr><td><strong>全部</strong></td><td>分析所有世界书条目（默认）</td></tr>
+          <tr><td><strong>仅处理指定</strong></td><td>只分析你勾选的条目</td></tr>
+          <tr><td><strong>排除指定</strong></td><td>分析除你勾选外的全部条目</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>过滤操作</h3>
+      <ul>
+        <li>🔍 <strong>搜索</strong> — 快速定位条目</li>
+        <li>☑️ <strong>全选/清空</strong> — 批量操作</li>
+        <li>🔄 <strong>反选</strong> — 反转当前选择</li>
+        <li>📌 <strong>搜索结果全选</strong> — 只选中搜索结果中的条目</li>
+      </ul>
+      <div class="callout callout-tip">
+        <span class="callout-icon">💡</span>
+        <span>切换角色卡时，过滤设置会自动重置为"全部"模式，避免跨角色误用。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cache -->
+  <div class="section" id="cache">
+    <div class="section-header">
+      <div class="section-icon">💾</div>
+      <h2>缓存管理</h2>
+    </div>
+
+    <div class="card">
+      <h3>SCAN_DONE 缓存</h3>
+      <p>Lorevnter 监听酒馆的 SCAN_DONE 事件，缓存当前激活的世界书条目。管线分析时优先处理缓存中的命中条目，提高效率。</p>
+    </div>
+
+    <div class="card">
+      <h3>清理模式</h3>
+      <div class="table-wrap">
+        <table>
+          <tr><th>模式</th><th>说明</th></tr>
+          <tr><td><strong>分析后自动</strong></td><td>每次管线完成后自动清空缓存（推荐）</td></tr>
+          <tr><td><strong>手动</strong></td><td>缓存持续累积，需要手动清理</td></tr>
+        </table>
+      </div>
+      <div class="callout callout-info">
+        <span class="callout-icon">ℹ️</span>
+        <span>超过 3 天未更新的缓存会在切换聊天时弹出提醒，可一键清理。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backup -->
+  <div class="section" id="backup">
+    <div class="section-header">
+      <div class="section-icon">📋</div>
+      <h2>备份与回档</h2>
+    </div>
+
+    <div class="card">
+      <h3>自动备份</h3>
+      <p>每次 AI 分析前，Lorevnter 会自动为所有参与的世界书创建快照。如果 AI 的修改不理想，可以一键回档。</p>
+      <ul>
+        <li><strong>备份间隔</strong> — 每 N 次管线执行备份一次（默认每次）</li>
+        <li><strong>保留数量</strong> — 最多保留 N 个备份（默认 5 个）</li>
+        <li><strong>回档操作</strong> — 在世界书页签的备份列表中选择并还原</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Debug -->
+  <div class="section" id="debug">
+    <div class="section-header">
+      <div class="section-icon">🐛</div>
+      <h2>调试面板</h2>
+    </div>
+
+    <div class="card">
+      <h3>调试工具一览</h3>
+      <div class="table-wrap">
+        <table>
+          <tr><th>工具</th><th>功能</th></tr>
+          <tr><td><strong>系统自检</strong></td><td>检查 API 连通性、世界书状态、设置完整性等</td></tr>
+          <tr><td><strong>管线预览</strong></td><td>查看发送给 AI 的完整提示词和 Token 统计</td></tr>
+          <tr><td><strong>AI 历史</strong></td><td>查看历次 AI 分析的请求和响应</td></tr>
+          <tr><td><strong>操作日志</strong></td><td>实时日志，支持级别过滤（info / warn / error）</td></tr>
+          <tr><td><strong>测试模式</strong></td><td>模拟写入假数据测试审核/写入管线</td></tr>
+          <tr><td><strong>缓存面板</strong></td><td>查看当前缓存的命中条目</td></tr>
+          <tr><td><strong>一键导出</strong></td><td>导出完整调试信息用于排查问题</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>测试模式</h3>
+      <p>在调试面板中可以使用测试模式：</p>
+      <ol>
+        <li>选择目标世界书</li>
+        <li>点击「执行测试写入」— 插件会构造模拟数据并打开审核弹窗</li>
+        <li>审核确认后写入世界书</li>
+        <li>点击「一键回档」恢复到测试前状态</li>
+      </ol>
+      <div class="callout callout-tip">
+        <span class="callout-icon">💡</span>
+        <span>测试模式不消耗 API 额度，适合验证审核/写入管线是否正常工作。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="section" id="faq">
+    <div class="section-header">
+      <div class="section-icon">❓</div>
+      <h2>常见问题</h2>
+    </div>
+
+    <details class="accordion">
+      <summary>AI 分析后什么都没更新？</summary>
+      <div class="accordion-body">
+        <p>可能的原因：</p>
+        <ul>
+          <li>没有设置约束 — AI 在无约束时倾向保守，建议为重要条目设置提示词约束</li>
+          <li>正文太短 — AI 需要足够的聊天上下文才能发现变化</li>
+          <li>条目被 skip — 检查是否有跳过约束绑定</li>
+          <li>缓存为空 — 首次运行无缓存会分析全部条目，确认正文中提到了相关角色/地点</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>AI 只更新人设，不更新世界书条目？</summary>
+      <div class="accordion-body">
+        <p>这通常是因为缺少 CoT 思考链引导。Lorevnter 内置了 CoT 指令，确保 AI 逐条分析每个条目而不只是关注最显眼的变化。如果仍有问题：</p>
+        <ul>
+          <li>确认约束中明确了需要记录的内容类型</li>
+          <li>在调试面板的「管线预览」中检查提示词是否正确</li>
+          <li>尝试调低 Temperature 提高 AI 遵循指令的准确性</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>缓存越来越大怎么办？</summary>
+      <div class="accordion-body">
+        <p>Lorevnter 的缓存策略是<strong>覆盖模式</strong>——每次 SCAN_DONE 事件用最新的激活列表直接覆盖，不会无限累积。如果使用「分析后自动」清理模式（默认），每次管线完成后缓存会自动清空。如果选择了「手动」模式，可以在 AI 配置页手动清理。</p>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>怎么知道 AI 看到了什么？</summary>
+      <div class="accordion-body">
+        <p>在调试面板中点击「管线预览」，可以看到发送给 AI 的完整提示词内容，包括：</p>
+        <ul>
+          <li>系统规则和约束</li>
+          <li>待分析条目列表（含当前内容）</li>
+          <li>提取后的聊天正文</li>
+          <li>Token 统计（确保不超过模型上下文限制）</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>支持哪些 AI 模型？</summary>
+      <div class="accordion-body">
+        <p>Lorevnter 使用 OpenAI 兼容的 API 格式。支持：</p>
+        <ul>
+          <li>OpenAI GPT-4o / GPT-4</li>
+          <li>Claude (通过兼容 API)</li>
+          <li>任何 OpenAI 兼容端点（如 OpenRouter、本地部署等）</li>
+        </ul>
+        <p>复用酒馆连接时，使用酒馆当前配置的模型。</p>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>约束和提示词的区别？</summary>
+      <div class="accordion-body">
+        <p><strong>约束</strong>是<strong>条目级</strong>的规则——针对特定条目的处理指令。<strong>提示词</strong>是<strong>全局级</strong>的模板——控制 AI 的整体分析行为和输出格式。两者协同工作：提示词定义了分析框架，约束在框架内为每个条目定制策略。</p>
+      </div>
+    </details>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <p>Lorevnter v0.1.0 · Made with 💜 for SillyTavern</p>
+  <p style="margin-top: 8px;"><a href="https://github.com/Kaguya-1210/Lorevnter" target="_blank">GitHub</a></p>
+</div>
+
+<!-- Back to Top -->
+<button class="back-top" id="backTop" onclick="window.scrollTo({top:0})">↑</button>
+
+<script>
+  // Back to top visibility
+  window.addEventListener('scroll', () => {
+    document.getElementById('backTop').classList.toggle('visible', window.scrollY > 400);
+  });
+
+  // Nav active highlight
+  const sections = document.querySelectorAll('.section[id]');
+  const navLinks = document.querySelectorAll('.nav a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(link => {
+          link.classList.toggle('active', link.getAttribute('href') === '#' + entry.target.id);
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
