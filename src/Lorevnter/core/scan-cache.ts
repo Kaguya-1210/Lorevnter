@@ -163,18 +163,19 @@ export function clearCacheForChat(chatId: string): void {
 }
 
 /**
- * 检查过期缓存。
- * 返回超过 3 天未更新的 chatId 列表。
- * 调用方（index.ts CHAT_CHANGED 回调）负责弹窗提示。
+ * 检查过期缓存（仅返回手动模式下残留的）。
+ * 自动模式下过期缓存已在 pruneOldCaches 中自动清理。
  */
 export function getStaleChats(): string[] {
   const { settings } = useSettingsStore();
+  // 自动清理模式下不需要提醒（pruneOldCaches 已处理）
+  if (settings.lore_cache_clear_mode === 'after_analysis') return [];
+
   const now = Date.now();
   const stale: string[] = [];
 
   for (const [chatId, ts] of Object.entries(settings.lore_scan_cache_timestamps)) {
     if (now - ts > STALE_THRESHOLD_MS) {
-      // 确认该 chatId 确实有缓存数据
       if (settings.lore_scan_cache[chatId]?.length) {
         stale.push(chatId);
       }
@@ -185,45 +186,59 @@ export function getStaleChats(): string[] {
 }
 
 /**
- * 清理孤儿缓存：保留最多 MAX_CACHED_CHATS 个，淘汰最旧的。
- * 同时清理空缓存和缺失 timestamp 的记录。
+ * 清理孤儿缓存：
+ * 1. 清空缓存数组为空的残留记录
+ * 2. 自动删除超过 3 天的过期缓存（不再弹窗烦人）
+ * 3. 超出上限时淘汰最旧的
  */
 function pruneOldCaches(): void {
   const { settings } = useSettingsStore();
+  const now = Date.now();
+  let cleaned = 0;
 
   // 1. 清理空缓存数组和残留 timestamps
   for (const chatId of Object.keys(settings.lore_scan_cache)) {
     if (!settings.lore_scan_cache[chatId]?.length) {
       delete settings.lore_scan_cache[chatId];
       delete settings.lore_scan_cache_timestamps[chatId];
+      cleaned++;
     }
   }
-  // 清理没有对应缓存数据的 timestamps
   for (const chatId of Object.keys(settings.lore_scan_cache_timestamps)) {
     if (!settings.lore_scan_cache[chatId]?.length) {
       delete settings.lore_scan_cache_timestamps[chatId];
+      cleaned++;
     }
   }
 
-  // 2. 超出上限时淘汰最旧的
-  const chatIds = Object.keys(settings.lore_scan_cache);
-  if (chatIds.length <= MAX_CACHED_CHATS) return;
-
-  // 按 timestamp 升序排列（最旧在前）
-  const sorted = chatIds
-    .map(id => ({ id, ts: settings.lore_scan_cache_timestamps[id] ?? 0 }))
-    .sort((a, b) => a.ts - b.ts);
-
-  const toRemove = sorted.slice(0, sorted.length - MAX_CACHED_CHATS);
-  for (const { id } of toRemove) {
-    // 不删当前聊天
-    if (id === currentChatId) continue;
-    delete settings.lore_scan_cache[id];
-    delete settings.lore_scan_cache_timestamps[id];
+  // 2. 自动清理超过 3 天的过期缓存（非当前聊天）
+  for (const [chatId, ts] of Object.entries(settings.lore_scan_cache_timestamps)) {
+    if (chatId === currentChatId) continue;
+    if (now - ts > STALE_THRESHOLD_MS) {
+      delete settings.lore_scan_cache[chatId];
+      delete settings.lore_scan_cache_timestamps[chatId];
+      cleaned++;
+    }
   }
 
-  if (toRemove.length > 0) {
-    logger.info(`缓存清理: 淘汰 ${toRemove.length} 个旧聊天缓存，保留 ${MAX_CACHED_CHATS} 个`);
+  // 3. 超出上限时淘汰最旧的
+  const chatIds = Object.keys(settings.lore_scan_cache);
+  if (chatIds.length > MAX_CACHED_CHATS) {
+    const sorted = chatIds
+      .map(id => ({ id, ts: settings.lore_scan_cache_timestamps[id] ?? 0 }))
+      .sort((a, b) => a.ts - b.ts);
+
+    const toRemove = sorted.slice(0, sorted.length - MAX_CACHED_CHATS);
+    for (const { id } of toRemove) {
+      if (id === currentChatId) continue;
+      delete settings.lore_scan_cache[id];
+      delete settings.lore_scan_cache_timestamps[id];
+      cleaned++;
+    }
+  }
+
+  if (cleaned > 0) {
+    logger.info(`缓存清理: 清除 ${cleaned} 条孤儿/过期记录`);
   }
 }
 
