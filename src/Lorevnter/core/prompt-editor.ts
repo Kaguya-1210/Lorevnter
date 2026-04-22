@@ -84,54 +84,75 @@ export const BUILTIN_UPDATE_PRESET: PromptItem[] = [
     enabled: true,
     content: `<task>
 分析对话和条目数据，判断哪些条目需要更新。
-
-先在 <lore_think> 中思考，每条认真分析不许偷懒，想多少写多少！
-
-<lore_think>
-对每个条目自由分析，重点关注：
-- 这个条目记录了什么？和最新剧情（<latest_context>）有关系吗？
-- 对话中有没有新信息要补进去？有没有和现有内容矛盾的地方？
-- 条目里有没有模糊的说法？（如"极少""一些""可能"等）能不能从对话或其他条目里找到具体信息替换掉？
-- 这个条目和用户人设有关系吗？人设里提到了什么相关信息？
-- 有约束吗？约束怎么说的？
-- 要不要改？要改的话，改哪里？
-
-最后分析用户人设本身：
-- 对话中是否出现了与人设矛盾的信息？
-- 是否有新的事实需要更新到人设中？
-- 人设需要修改吗？
-</lore_think>
-
-想完了直接出 JSON。
+你需要在 <lore_think> 中进行分析，严格按照 <thinking_format> 的格式进行思考。
+思考完毕后直接输出 JSON 结果。
 </task>
+
+<thinking_format>
+对每个条目，按以下结构快速判断（禁止复述条目原文内容）：
+
+- 条目名：
+- 与最新剧情的关联：有 / 无（无则跳到结论）
+- 变化点：（一句话概括需要修改或追加的内容，不要引用原文）
+- 约束检查：无约束 / 约束要求 xxx
+- 结论：更新 / 跳过
+
+NOTE: 不需要更新的条目只写条目名和"跳过"即可，不要展开分析。
+NOTE: 禁止罗列或复述条目已有内容，只关注变化部分。
+</thinking_format>
 
 <output_format>
 {
   "updates": [
     {
       "entryName": "条目名（必须与输入完全匹配）",
-      "entryUid": 条目uid数字（从entry标签的uid属性获取）,
-      "newContent": "完整的新内容（保留未变化的部分）",
+      "entryUid": 条目uid数字,
+      "type": "update",
+      "patches": [
+        { "find": "条目中需要替换的旧片段原文", "replace": "替换后的新片段" },
+        { "find": "另一处旧片段", "replace": "另一处新片段" },
+        { "type": "append", "content": "需要追加到条目末尾的新信息" }
+      ],
       "reason": "一句话理由"
+    },
+    {
+      "entryName": "新条目名",
+      "type": "create",
+      "content": "完整的新条目内容",
+      "reason": "创建理由"
     },
     {
       "entryName": "__persona__",
       "entryUid": -1,
-      "newContent": "更新后的完整人设内容",
+      "type": "update",
+      "patches": [
+        { "find": "人设中需要替换的旧片段", "replace": "替换后的新片段" }
+      ],
       "reason": "人设更新理由"
     }
   ]
 }
 没有要改的就返回：{"updates": []}
-注意：更新用户人设时 entryName 必须为 "__persona__"，entryUid 为 -1
 </output_format>
 
+<patch_rules>
+1. patches 中 find 必须是条目原文中的精确片段，不要修改、省略或概括
+2. replace 是替换后的完整片段
+3. 一个条目有多处修改时，使用多个 patch 项，不要合并为一个大块
+4. 新增信息用 { "type": "append", "content": "..." } 追加到末尾
+5. 新建条目用 type="create" + content（不需要 patches）
+6. 更新人设时 entryName 必须为 "__persona__"，entryUid 为 -1
+</patch_rules>
+
 <final_reminder>
-1. 逐条分析，不跳过
-2. 模糊词必须精确化：交叉比对条目和对话找具体信息
-3. 约束规则最优先
-4. 用户人设也是分析目标，如有变化请用 entryName="__persona__" 输出
-5. 思考完直接输出 JSON
+1. 每个条目都必须过一遍，不许跳过
+2. 禁止复述条目原文——只写变化点和结论
+3. 不更新的条目写"跳过"，一行结束
+4. 模糊词必须精确化：交叉比对条目和对话找具体信息
+5. 约束规则最优先
+6. 用户人设也是分析目标
+7. 思考完直接输出 JSON，不要输出其他内容
+8. patches 中 find 必须能在原文中精确找到，否则更新会失败
 </final_reminder>`,
   },
   {
@@ -140,8 +161,6 @@ export const BUILTIN_UPDATE_PRESET: PromptItem[] = [
     name: 'CoT 锚定',
     enabled: true,
     content: `<lore_think>
-我将逐条分析每个条目：
-
 `,
   },
 ];

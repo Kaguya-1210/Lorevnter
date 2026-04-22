@@ -5,6 +5,7 @@
 
 import { createLogger } from '../logger';
 import { useSettingsStore, type PromptItem, type LoreConstraint } from '../settings';
+import { useRuntimeStore } from '../state';
 import { getEntryMacro, getEntryConstraints, collectActiveConstraints, resolveMacros, resolveLoreMacros, getConstraintById } from './constraints';
 import { getUserPersona } from './persona';
 import { useContextStore } from './worldbook-context';
@@ -58,13 +59,36 @@ function parseCandidateUpdates(raw: string): UpdateInstruction[] {
   const normalizeUpdates = (parsed: unknown): UpdateInstruction[] => {
     const result = RawResponseSchema.safeParse(parsed);
     if (!result.success) return [];
-    return result.data.updates.map((u) => ({
-      entryName: String(u.entryName ?? u.name ?? ''),
-      newContent: String(u.newContent ?? u.content ?? ''),
-      reason: String(u.reason ?? ''),
-      think: String(u.think ?? ''),
-      entryUid: u.entryUid != null && Number.isFinite(Number(u.entryUid)) ? Number(u.entryUid) : undefined,
-    }));
+    return result.data.updates.map((u): UpdateInstruction => {
+      const entryName = String(u.entryName ?? u.name ?? '');
+      const reason = String(u.reason ?? '');
+      const think = String(u.think ?? '');
+      const entryUid = u.entryUid != null && Number.isFinite(Number(u.entryUid)) ? Number(u.entryUid) : undefined;
+
+      // 判断类型：显式 type > 有 patches > 有 newContent/content（旧格式兼容）
+      const explicitType = u.type ?? (u.patches ? 'update' : undefined);
+      const legacyContent = String(u.newContent ?? u.content ?? '');
+
+      if (explicitType === 'create') {
+        return { entryName, type: 'create', content: legacyContent || undefined, patches: undefined, reason, think, entryUid };
+      }
+
+      if (u.patches && u.patches.length > 0) {
+        // 新格式：直接用 patches
+        const patches: PatchOp[] = u.patches.map(p => {
+          if ('find' in p) return { find: p.find, replace: p.replace };
+          return { type: 'append' as const, content: p.content };
+        });
+        return { entryName, type: 'update', patches, reason, think, entryUid };
+      }
+
+      if (legacyContent) {
+        // 旧格式兼容：newContent 全文 → 在管线中降级处理
+        return { entryName, type: 'update', content: legacyContent, reason, think, entryUid };
+      }
+
+      return { entryName, type: 'update', reason, think, entryUid };
+    });
   };
 
   let cleaned = raw;
@@ -138,23 +162,37 @@ function sanitizeAnalysisResult(request: AnalysisRequest, rawUpdates: UpdateInst
 
   for (const update of rawUpdates) {
     const entryName = update.entryName.trim();
-    const newContent = update.newContent.trim();
     const reason = update.reason.trim() || 'AI 未提供理由';
     const numericUid = update.entryUid != null && Number.isFinite(update.entryUid) ? update.entryUid : undefined;
     const think = update.think?.trim() || '';
+    const hasPatches = update.patches && update.patches.length > 0;
+    const hasContent = update.content && update.content.trim().length > 0;
 
-    if (!entryName || !newContent) continue;
+    if (!entryName) continue;
+    // update 模式需要 patches 或 content（旧格式兼容），create 模式需要 content
+    if (update.type === 'create' && !hasContent) continue;
+    if (update.type === 'update' && !hasPatches && !hasContent) continue;
 
+    // 人设更新
     if (entryName === '__persona__') {
       if (!settings.lore_include_persona) continue;
-      const currentPersona = (getUserPersona() ?? '').trim();
-      if (currentPersona === newContent) continue;
       if (seenTargets.has('persona')) continue;
       seenTargets.add('persona');
-      sanitized.push({ entryName, entryUid: -1, newContent, reason, think });
+      sanitized.push({ entryName, entryUid: -1, type: update.type, patches: update.patches, content: update.content, reason, think });
       continue;
     }
 
+    // create 模式：不在已有条目中
+    if (update.type === 'create') {
+      if (existingNames.has(entryName)) continue;
+      const targetKey = `create:${entryName}`;
+      if (seenTargets.has(targetKey)) continue;
+      seenTargets.add(targetKey);
+      sanitized.push({ entryName, type: 'create', content: update.content, reason, think });
+      continue;
+    }
+
+    // update 模式：匹配已有条目
     let matchedEntry: AnalysisEntry | null = null;
     if (numericUid != null && numericUid >= 0) {
       matchedEntry = request.entries.find(ae => ae.entry.uid === numericUid) ?? null;
@@ -167,25 +205,27 @@ function sanitizeAnalysisResult(request: AnalysisRequest, rawUpdates: UpdateInst
     }
 
     if (matchedEntry) {
-      if (matchedEntry.entry.content.trim() === newContent) continue;
       const targetKey = `entry:${matchedEntry.entry.uid}`;
       if (seenTargets.has(targetKey)) continue;
       seenTargets.add(targetKey);
       sanitized.push({
         entryName: matchedEntry.entry.name,
         entryUid: matchedEntry.entry.uid,
-        newContent,
+        type: 'update',
+        patches: update.patches,
+        content: update.content,
         reason,
         think,
       });
       continue;
     }
 
+    // 未匹配到已有条目且不是显式 create → 当做新建
     if (existingNames.has(entryName)) continue;
     const targetKey = `create:${entryName}`;
     if (seenTargets.has(targetKey)) continue;
     seenTargets.add(targetKey);
-    sanitized.push({ entryName, newContent, reason, think });
+    sanitized.push({ entryName, type: 'create', content: update.content, reason, think });
   }
 
   return sanitized;
@@ -226,20 +266,131 @@ function buildCustomApiConfig(): CustomApiConfig | undefined {
     ...samplingParams,
   };
 }
+// ── 直接 fetch 调用 OpenAI 兼容 API（绕过酒馆代理，支持真并发） ──
+
+/**
+ * 直接通过 fetch 调用 OpenAI 兼容 API。
+ * 不经过酒馆的 generateRaw 代理，完全独立的 HTTP 连接。
+ * 当 lore_concurrent_mode=true 且 source=custom 时启用。
+ */
+async function directOpenAiFetch(
+  messages: Array<{ role: string; content: string }>,
+  apiUrl: string,
+  apiKey: string | undefined,
+  model: string | undefined,
+  samplingParams: Record<string, unknown>,
+): Promise<string> {
+  // 智能拼接 URL：如果用户 base URL 已包含 /v1 或更深路径，不重复拼接
+  const trimmedUrl = apiUrl.replace(/\/+$/, '');
+  const url = trimmedUrl.match(/\/v\d+(\/|$)/)
+    ? `${trimmedUrl}/chat/completions`
+    : `${trimmedUrl}/v1/chat/completions`;
+
+  const body: Record<string, unknown> = {
+    model: model || 'gpt-4',
+    messages,
+    stream: false,
+    ...Object.fromEntries(
+      Object.entries(samplingParams).filter(([, v]) => v !== 'same_as_preset' && v !== 'unset' && v != null),
+    ),
+  };
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+
+  logger.debug(`直连 API: ${url}, model=${model || '(default)'}`);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120_000);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`API HTTP ${response.status}: ${errorText.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+
+    // OpenAI 格式: data.choices[0].message.content
+    const content = data?.choices?.[0]?.message?.content;
+    if (typeof content !== 'string') {
+      throw new Error('API 响应格式异常: 缺少 choices[0].message.content');
+    }
+
+    return content;
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') {
+      throw new Error('API 请求超时（120s）');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 /**
  * 构建统一的 API 调用函数。
- * 两种模式都通过 generateRaw + custom_api 走酒馆的统一代理路径。
+ * - concurrent + custom 模式：directOpenAiFetch 直连（真并发）
+ * - 其他情况：generateRaw 走酒馆代理
  */
 function buildApiCaller(): (opts: ApiCallerOptions) => Promise<string> {
+  const { settings } = useSettingsStore();
   const customApi = buildCustomApiConfig();
 
+  // 并发模式 + custom 端点 → 直连
+  if (settings.lore_concurrent_mode && settings.lore_api_source === 'custom' && settings.lore_api_base_url) {
+    const apiUrl = settings.lore_api_base_url.replace(/\/+$/, '');
+    const apiKey = settings.lore_api_key || undefined;
+    const model = settings.lore_api_model || undefined;
+
+    const sampling: Record<string, unknown> = {};
+    if (settings.lore_ai_temperature !== 'same_as_preset') sampling.temperature = settings.lore_ai_temperature;
+    if (settings.lore_ai_top_p !== 'same_as_preset') sampling.top_p = settings.lore_ai_top_p;
+    if (settings.lore_ai_max_tokens !== 'same_as_preset') sampling.max_tokens = settings.lore_ai_max_tokens;
+    if (settings.lore_ai_frequency_penalty !== 'same_as_preset') sampling.frequency_penalty = settings.lore_ai_frequency_penalty;
+    if (settings.lore_ai_presence_penalty !== 'same_as_preset') sampling.presence_penalty = settings.lore_ai_presence_penalty;
+
+    logger.info('API 模式: 直连（并发模式）');
+
+    return async ({ ordered_prompts }) => {
+      const messages = ordered_prompts.map(p => ({ role: p.role, content: p.content }));
+      return await directOpenAiFetch(messages, apiUrl, apiKey, model, sampling);
+    };
+  }
+
+  // 非并发 / tavern 模式 → 酒馆代理
+  logger.info(`API 模式: 酒馆代理${settings.lore_api_source === 'custom' ? '（并发未开启）' : ''}`);
   return async ({ ordered_prompts }) => {
-    return await generateRaw({
-      ordered_prompts,
-      should_silence: true,
-      custom_api: customApi,
-    } as any);
+    // 流式 token 写入 runtime store → UI 实时展示
+    const runtime = useRuntimeStore();
+    runtime.streamingText = '';
+    const streamHandler = (text: string) => {
+      runtime.streamingText = text;
+    };
+    eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, streamHandler);
+
+    try {
+      const result = await generateRaw({
+        ordered_prompts,
+        should_silence: true,
+        should_stream: true,  // 流式保持连接活跃，防止反代 524 超时
+        custom_api: customApi,
+      } as any);
+      return result;
+    } finally {
+      eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, streamHandler);
+    }
   };
 }
 
@@ -356,9 +507,19 @@ export interface AnalysisRequest {
   worldbookMap: Record<string, WorldbookEntry[]>;
 }
 
+/** 单个补丁操作 */
+export type PatchOp =
+  | { find: string; replace: string }
+  | { type: 'append'; content: string };
+
 export interface UpdateInstruction {
   entryName: string;
-  newContent: string;
+  /** 操作类型：update=补丁更新已有条目, create=创建新条目 */
+  type: 'update' | 'create';
+  /** update 模式下的变更补丁 */
+  patches?: PatchOp[];
+  /** create 模式下的完整内容 */
+  content?: string;
   reason: string;
   think?: string;
   /** 条目 uid（AI 返回时可能包含，用于精确定位） */
@@ -393,16 +554,18 @@ const SAFE_UPDATE_PROMPT_ITEMS: PromptItem[] = [
 3. 无约束的条目：仅在出现明确新事实、状态变化、关系变化，或能将模糊表述精确化时，才更新。
 4. 如果证据不足或只是措辞差异，不更新（此规则不适用于有约束的条目——约束已明确指定更新策略）。
 5. 优先更新已有条目；只有当稳定新概念无法合理归入任何已有条目时，才创建新条目。
-6. newContent 必须是完整替换文本，保留所有仍然成立的原有信息。
+6. 使用 patches（find/replace）精确修改变化部分，不要复述未变化内容。
 7. 保持原条目的格式、结构和文风。
 </decision_rules>
 
 <output_rules>
 1. 只能输出 JSON 对象，不要输出解释、前言、代码块或思考过程。
-2. updates 中每一项都必须包含 entryName、newContent、reason。
-3. 更新已有条目时必须填写 entryUid。
-4. 更新用户人设时 entryName 必须是 "__persona__"，entryUid 必须是 -1。
-5. 没有需要更新的条目时，返回 {"updates":[] }。
+2. 更新已有条目用 type="update" + patches 数组（find/replace 或 append）。
+3. 新建条目用 type="create" + content。
+4. patches.find 必须是条目原文中的精确片段。
+5. 更新已有条目时必须填写 entryUid。
+6. 更新用户人设时 entryName 必须是 "__persona__"，entryUid 必须是 -1。
+7. 没有需要更新的条目时，返回 {"updates":[] }。
 </output_rules>`,
   },
   {
@@ -424,16 +587,20 @@ const SAFE_UPDATE_PROMPT_ITEMS: PromptItem[] = [
 {
   "updates": [
     {
-      "entryName": "与输入完全一致的条目名",
+      "entryName": "条目名",
       "entryUid": 123,
-      "newContent": "完整的新内容",
-      "reason": "一句话说明原因"
+      "type": "update",
+      "patches": [
+        { "find": "旧片段原文", "replace": "新片段" },
+        { "type": "append", "content": "追加的新信息" }
+      ],
+      "reason": "理由"
     },
     {
-      "entryName": "__persona__",
-      "entryUid": -1,
-      "newContent": "更新后的人设全文",
-      "reason": "一句话说明原因"
+      "entryName": "新条目名",
+      "type": "create",
+      "content": "完整内容",
+      "reason": "理由"
     }
   ]
 }
@@ -467,9 +634,17 @@ const PROMPT_ITEM_BLOCKLIST = new Set([
   // builtin_update_task 和 builtin_update_ast 恢复（CoT 思考链）
 ]);
 
+const RawPatchSchema = z.union([
+  z.object({ find: z.string(), replace: z.string() }),
+  z.object({ type: z.literal('append'), content: z.string() }),
+]);
+
 const RawUpdateSchema = z.object({
   entryName: z.union([z.string(), z.number()]).optional(),
   name: z.union([z.string(), z.number()]).optional(),
+  type: z.enum(['update', 'create']).optional(),
+  patches: z.array(RawPatchSchema).optional(),
+  // 兼容旧格式 + create 模式
   newContent: z.union([z.string(), z.number()]).optional(),
   content: z.union([z.string(), z.number()]).optional(),
   reason: z.union([z.string(), z.number()]).optional(),
@@ -596,12 +771,12 @@ function buildUpdatePrompts(
     ...source.filter(p => !PROMPT_ITEM_BLOCKLIST.has(p.id)),
   ];
 
-  return normalizedSource
+  const result = normalizedSource
     .map(p => ({
       role: p.role,
       content: (() => {
         let content = resolveMacros(resolveLoreMacros(p.content, loreMacros), allEntries);
-        if (p.id === 'builtin_safe_update_sys') {
+        if (p.id === 'builtin_safe_update_sys' && !useSettingsStore().settings.lore_ai_disable_thinking) {
           content += '\n<visible_think_policy>你可以返回 top-level think 和每条 update 的 think，但必须是可展示的简短分析摘要，不要长篇隐式推理。</visible_think_policy>';
         }
         return content;
@@ -609,6 +784,31 @@ function buildUpdatePrompts(
     } as RolePrompt))
     // 过滤掉宏解析后内容为空的提示词块（如人设关闭时 <user_persona></user_persona>）
     .filter(p => p.content.replace(/<[^>]+>\s*<\/[^>]+>/g, '').trim().length > 0);
+
+  // ── Prefill 欺骗：卡掉原生 CoT ──
+  // 在最后一条 assistant 消息前注入已关闭的 <think> 块，
+  // 让模型认为原生思考阶段已完成，直接跳到输出。
+  // 这是通用方案，不依赖 API 参数，对任何模型/代理都有效。
+  if (useSettingsStore().settings.lore_ai_disable_thinking) {
+    try {
+      const thinkPrefill = '<think>\n我已完成对世界书条目的分析。\n</think>\n';
+      // 兼容写法：手动找最后一条 assistant 消息
+      let lastAstIdx = -1;
+      for (let i = result.length - 1; i >= 0; i--) {
+        if (result[i].role === 'assistant') { lastAstIdx = i; break; }
+      }
+      if (lastAstIdx >= 0) {
+        result[lastAstIdx].content = thinkPrefill + result[lastAstIdx].content;
+      } else {
+        result.push({ role: 'assistant', content: thinkPrefill + '{' });
+      }
+      logger.debug('已注入 think prefill 欺骗');
+    } catch (e) {
+      logger.warn(`Prefill 注入失败: ${(e as Error).message}，跳过`);
+    }
+  }
+
+  return result;
 }
 
 
@@ -664,8 +864,12 @@ export async function analyzeOnePass(request: AnalysisRequest): Promise<Analysis
   };
 
   // Step 3: 构建消息序列（宏在 buildUpdatePrompts 内替换）
+  // 只传命中条目（不是全部条目），保证 resolveMacros 也只处理命中条目
   void loreMacros;
-  const ordered_prompts = buildUpdatePrompts(request.allEntries, buildLoreMacros(request));
+  const ordered_prompts = buildUpdatePrompts(
+    request.entries.map(ae => ae.entry),
+    buildLoreMacros(request),
+  );
 
   toastr.info('AI 正在分析...', 'Lorevnter');
 
@@ -676,6 +880,28 @@ export async function analyzeOnePass(request: AnalysisRequest): Promise<Analysis
     const rawResponse = await callApi({ ordered_prompts });
 
     logger.debug('AI 原始响应', rawResponse);
+
+    // ── 关键：检测 API 错误标记 ──
+    // generateRaw 在 API 失败时返回错误字符串（不是 throw），必须主动检测并抛出异常
+    if (!rawResponse || !rawResponse.trim()) {
+      throw new Error('API 返回空响应');
+    }
+    const trimmedResponse = rawResponse.trim();
+    const apiErrorPatterns = ['[API Error]', '[Error]', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND'];
+    for (const pattern of apiErrorPatterns) {
+      if (trimmedResponse.includes(pattern)) {
+        throw new Error(`API 返回错误: ${trimmedResponse.slice(0, 200)}`);
+      }
+    }
+    // 检测 HTTP 错误状态码（status 4xx/5xx）
+    const httpMatch = trimmedResponse.match(/\bstatus\s+(\d{3})\b/i);
+    if (httpMatch) {
+      const code = parseInt(httpMatch[1], 10);
+      if (code >= 400) {
+        throw new Error(`API HTTP ${code}: ${trimmedResponse.slice(0, 200)}`);
+      }
+    }
+
     concatPrefill('', rawResponse);
     const result = parseAiResponse(rawResponse, request);
     logger.info(`一次调用完成: ${result.updates.length} 条需更新`);

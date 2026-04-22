@@ -6,6 +6,17 @@
       <button class="wb-btn wb-btn-ai" @click="onAiAnalyze">🔍 AI 分析</button>
     </div>
 
+    <!-- AI 分析实时预览 -->
+    <div v-if="runtime.pipelineStatus === 'running'" class="wb-stream-preview">
+      <div class="wb-stream-header">
+        <span class="wb-stream-dot"></span>
+        <span>AI 正在分析...</span>
+        <span class="wb-stream-timer">{{ elapsedSeconds }}s</span>
+      </div>
+      <pre v-if="runtime.streamingText" class="wb-stream-content">{{ runtime.streamingText }}</pre>
+      <div v-else class="wb-stream-waiting">等待模型响应...</div>
+    </div>
+
     <!-- 功能说明 -->
     <div class="wb-hint-bar">
       💡 此页面用于<strong>浏览和查看</strong>条目内容。如需指定 AI 管理哪些世界书，请到「设置 → 世界书管理」中配置。
@@ -127,6 +138,23 @@ const entries = ref<WorldbookEntry[]>([]);
 const loading = ref(false);
 const activeInfo = ref<ReturnType<typeof WorldbookAPI.getActive> | null>(null);
 
+// ── AI 分析计时器 ──
+const elapsedSeconds = ref(0);
+let timerHandle: ReturnType<typeof setInterval> | null = null;
+
+watch(() => runtime.pipelineStatus, (status) => {
+  if (status === 'running') {
+    elapsedSeconds.value = 0;
+    timerHandle = setInterval(() => {
+      if (runtime.pipelineStartTime > 0) {
+        elapsedSeconds.value = Math.round((Date.now() - runtime.pipelineStartTime) / 1000);
+      }
+    }, 1000);
+  } else {
+    if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
+  }
+});
+
 function refreshAll(silent = false) {
   try {
     allNames.value = WorldbookAPI.listAll();
@@ -171,12 +199,17 @@ function onSelectChange() {
 }
 
 async function onAiAnalyze() {
-  const result = await runUpdatePipeline();
-  // 只在直接写入完成后刷新列表，审核模式下不刷新（审核后的写入由回调处理）
-  if (result === 'applied' && selectedName.value) {
-    try {
-      entries.value = await WorldbookAPI.fetch(selectedName.value);
-    } catch (e) { logger.warn(`AI 分析后刷新条目失败: ${(e as Error).message}`); }
+  try {
+    const result = await runUpdatePipeline(true);
+    // 只在直接写入完成后刷新列表，审核模式下不刷新（审核后的写入由回调处理）
+    if (result === 'applied' && selectedName.value) {
+      try {
+        entries.value = await WorldbookAPI.fetch(selectedName.value);
+      } catch (e) { logger.warn(`AI 分析后刷新条目失败: ${(e as Error).message}`); }
+    }
+  } catch (e) {
+    logger.error(`AI 分析异常: ${(e as Error).message}`);
+    toastr.error(`AI 分析出错: ${(e as Error).message}`, 'Lorevnter');
   }
 }
 
@@ -468,4 +501,50 @@ onMounted(async () => {
 .wb-confirm-title { font-size: 16px; font-weight: 600; color: var(--lore-text-primary); margin-bottom: 10px; }
 .wb-confirm-text { font-size: 13px; color: var(--lore-text-secondary); line-height: 1.5; margin-bottom: 16px; }
 .wb-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* AI 流式预览 */
+.wb-stream-preview {
+  margin: 8px 0;
+  border: 1px solid var(--lore-border-light);
+  border-radius: var(--lore-radius-md, 8px);
+  background: rgba(0,0,0,0.3);
+  overflow: hidden;
+}
+.wb-stream-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px; color: var(--lore-text-secondary);
+  border-bottom: 1px solid var(--lore-border-light);
+}
+.wb-stream-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  animation: lore-pulse 1.2s infinite;
+}
+@keyframes lore-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.wb-stream-content {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 12px; line-height: 1.6;
+  color: var(--lore-text-primary);
+  white-space: pre-wrap; word-break: break-all;
+  max-height: 240px; overflow-y: auto;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+.wb-stream-waiting {
+  padding: 16px 12px;
+  font-size: 12px; color: var(--lore-text-muted, #666);
+  text-align: center;
+}
+.wb-stream-timer {
+  margin-left: auto;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  color: #4ade80;
+  font-weight: 600;
+}
 </style>

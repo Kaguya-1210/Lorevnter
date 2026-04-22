@@ -94,6 +94,18 @@ $(() => {
 
   mountApp();
 
+  // 初始化同步 chatId（热更新后 currentChatId 会丢失）
+  try {
+    const initChatId = SillyTavern.getCurrentChatId();
+    if (initChatId) {
+      setCurrentChatId(String(initChatId));
+      setCacheChatId(String(initChatId));
+      logger.info(`初始化 chatId: ${initChatId}`);
+    }
+  } catch (e) {
+    logger.warn(`初始化 chatId 失败: ${(e as Error).message}`);
+  }
+
   // ── 事件监听（世界书探测延迟到角色卡打开时） ──
   const ctx = useContextStore();
   const { settings } = useSettingsStore();
@@ -188,7 +200,8 @@ $(() => {
 
     if (incrementAndCheckAutoScan()) {
       logger.info('自动触发 AI 分析（AI 回复计数达到间隔）');
-      await runUpdatePipeline();
+      // fire-and-forget：不阻塞聊天，分析在后台异步执行
+      runUpdatePipeline().catch(e => logger.error(`后台分析失败: ${(e as Error).message}`));
     }
   });
 

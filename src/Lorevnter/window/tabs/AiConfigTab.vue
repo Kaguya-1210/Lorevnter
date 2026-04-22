@@ -52,6 +52,51 @@
       </div>
     </div>
 
+    <!-- 并发与重试 -->
+    <div class="st-group">
+      <div class="st-group-title">并发与重试</div>
+
+      <label class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">后台静默模式</span>
+          <input v-model="settings.lore_background_mode" type="checkbox" class="ios-toggle" />
+        </div>
+        <span class="st-hint">开启后自动分析时不弹提示，仅写入日志</span>
+      </label>
+
+      <label v-if="settings.lore_api_source === 'custom'" class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">并发直连</span>
+          <input v-model="settings.lore_concurrent_mode" type="checkbox" class="ios-toggle" />
+        </div>
+        <span class="st-hint">开启后分析请求直连 API，不经过酒馆代理，可与聊天并发进行（需 API 支持跨域）</span>
+      </label>
+
+      <div class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">失败重试</span>
+          <input v-model.number="settings.lore_retry_count" type="number" class="st-number" min="0" max="5" />
+        </div>
+        <span class="st-hint">API 调用失败后自动重试次数（0=不重试），每次退避 2s/4s/6s...</span>
+      </div>
+
+      <div class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">最小正文字数</span>
+          <input v-model.number="settings.lore_min_content_length" type="number" class="st-number" min="0" max="9999" />
+        </div>
+        <span class="st-hint">AI 最新回复正文低于此字数时跳过分析（0=不检查）{{ settings.lore_context_include_tag ? '，优先检查标签内字数' : '' }}</span>
+      </div>
+
+      <label class="st-row">
+        <div class="st-row-main">
+          <span class="st-label">禁用模型思考</span>
+          <input v-model="settings.lore_ai_disable_thinking" type="checkbox" class="ios-toggle" />
+        </div>
+        <span class="st-hint">通过 prefill 欺骗关闭 Gemini Thinking / OpenAI o-series 的内置推理链，大幅提速</span>
+      </label>
+    </div>
+
     <!-- 正文提取规则 -->
     <div class="st-group">
       <div class="st-group-title">正文提取</div>

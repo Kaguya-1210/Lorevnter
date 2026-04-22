@@ -54,6 +54,10 @@ export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
   const pipelineStatus = ref<PipelineStatus>('idle');
   /** 最近一次管线结果摘要 */
   const pipelineLastMessage = ref('');
+  /** AI 流式返回实时文本 */
+  const streamingText = ref('');
+  /** 管线开始时间戳 */
+  const pipelineStartTime = ref(0);
 
   /** 从 logger 缓冲区刷新日志到响应式状态 */
   function refreshLogs() {
@@ -73,6 +77,8 @@ export const useRuntimeStore = defineStore('lorevnter_runtime', () => {
     aiCallHistory,
     pipelineStatus,
     pipelineLastMessage,
+    streamingText,
+    pipelineStartTime,
     refreshLogs,
     clearAiHistory,
   };

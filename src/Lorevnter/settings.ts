@@ -194,7 +194,20 @@ const LorevnterSettings = z
     /** 条目过滤模式: all=全部, include=仅指定, exclude=排除指定 */
     lore_entry_filter_mode: z.enum(['all', 'include', 'exclude']).default('all'),
     /** 条目过滤映射: key=世界书名, value=条目uid列表 */
+    /** 条目过滤映射: key=世界书名, value=条目uid列表 */
     lore_entry_filter_map: z.record(z.string(), z.array(z.number())).default({}),
+
+    // ── 并发与重试 ──
+    /** 后台静默模式：开启后自动分析时不弹 toastr，仅写日志 */
+    lore_background_mode: z.boolean().default(false),
+    /** 并发直连：custom 模式下绕过酒馆代理，用独立 HTTP 连接调 API（可和聊天并发） */
+    lore_concurrent_mode: z.boolean().default(false),
+    /** 失败自动重试次数（0=不重试, 1-5） */
+    lore_retry_count: z.number().default(0),
+    /** 最小正文字数：AI 最新回复正文低于此字数则跳过分析（0=不检查） */
+    lore_min_content_length: z.number().default(0),
+    /** 禁用模型内置思考（Gemini Thinking / OpenAI o-series）：关闭后模型不做内部推理，速度更快 */
+    lore_ai_disable_thinking: z.boolean().default(false),
   })
   .prefault({});
 
